@@ -1,8 +1,8 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "notes": [
+    "Pip is benched after the penny test: no new buys, and what he holds is sold by his normal rules. He stays in town until a penny technique passes the Proving Grounds",
     "Your heroes learn from the Proving Grounds: Wren takes up the Bollinger bounce (the strategy that passed), Gareth and Pip let winners build, Old Bram and Ysolde switch to slower daily strategies (Parabolic SAR, Ichimoku) with far fewer fees",
-    "A penny-stock test for Pip in the Proving Grounds (today's busiest $1-$5 stocks, last 6 months)",
-    "Your old hero settings are backed up as bots.json.before-2026-10-07-proving-grounds.bak"
+    "A penny-stock test for Pip in the Proving Grounds (today's busiest $1-$5 stocks, last 6 months)"
   ]
 }

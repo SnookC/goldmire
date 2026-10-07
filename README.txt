@@ -72,6 +72,8 @@ THE RESEARCHERS  -- research.py
   * Always keep a symbol:          "pinned": ["MSFT"]
   * Change how often:   STOCK_EVERY_MINUTES and CRYPTO_EVERY_MINUTES in research.py
   * Change how many:    WATCH_SIZE in research.py
+  * Bench a hero (no new buys; what it holds is still sold by its rules):
+                        "benched": true   (remove it, or set false, to bring it back)
   It's a screen, not a crystal ball: it finds symbols that fit each style today.
 
 THE TOWN CRIER: NEWS EVERY 5 MINUTES  -- news.py

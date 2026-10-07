@@ -488,8 +488,10 @@ footer { font-size: 12.5px; color: var(--muted); }
   }
   function stateLine(b) {
     const h = b.hero || {}, n = (b.positions || []).length;
+    if (n && b.benched) return `<b>!</b> Benched: finishing ${n} last trade${n > 1 ? "s" : ""}, no new ones`;
     if (n) return `<b>!</b> At the camp outside the gate, out on ${n} trade${n > 1 ? "s" : ""}`;
     if (b.kind !== "crypto" && !state.marketOpen) return "Asleep at home until the market opens";
+    if (b.benched) return "On the bench by the tavern door (no new trades for now)";
     if (b.bank?.benched) return "Out of coin, sitting this one out";
     if (h.streak <= -2) return `Sulking after ${-h.streak} losses`;
     return b.kind === "penny" ? "Prowling the alleys for penny stocks" : "In town, waiting for a signal";

@@ -139,6 +139,9 @@ SETTINGS_UPDATES = [
         "Crypto-1": {"strategy": "parabolic_sar"},                       # slower, daily: far fewer fees
         "Crypto-2": {"strategy": "ichimoku_cloud"},
     }),
+    ("2026-10-07-bench-pip", "Pip benched after the penny test (no new buys; holdings sold by his rules)", {
+        "Penny": {"benched": True},
+    }),
 ]
 TRAINING = []      # what the latest settings update changed, for the town chronicle
 
@@ -579,7 +582,11 @@ def run_bot(bot, rnd, memory):
                 memory.setdefault("cooldown", {}).setdefault(name, {})[sym] = until.isoformat(timespec="seconds")
                 save_memory(memory)
 
-    # 3) Look for new buys if there are free slots
+    # 3) Look for new buys if there are free slots (not while you've benched this hero)
+    if bot.get("benched"):
+        if not held:
+            log.info(f"[{name}] on the bench (you benched this hero): no new buys")
+        return
     free_slots = bot["max_positions"] - len(held)
     if free_slots <= 0:
         return
@@ -679,7 +686,7 @@ def build_status(positions, memory, market_open, bots):
         realized = round(memory["realized"].get(b["name"], 0.0), 2)
         unrealized = round(sum(p["pl"] for p in pos_list), 2)
         out.append({
-            "name": b["name"], "kind": b["kind"], "strategy": b["strategy"],
+            "name": b["name"], "kind": b["kind"], "strategy": b["strategy"], "benched": bool(b.get("benched")),
             "strategy_name": STRATEGY_NAMES[b["strategy"]], "watchlist": wl,
             "researched": research.is_researched(b),
             "reasons": rs.get("reasons", {}).get(b["name"], {}),
@@ -982,6 +989,9 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
         h = game.hero_of(b)[0]
         what = (f"the {STRATEGY_NAMES.get(v, v)} technique" if k == "strategy" else "letting winners build" if (k, v) == ("exit", "build")
                 else "a smart stop" if (k, v) == ("stop_loss", "smart") else None)
+        if (k, v) == ("benched", True):
+            game.record_bench(memory, h)
+            continue
         if what:
             taught.setdefault(h, []).append(what)
     for h, whats in taught.items():

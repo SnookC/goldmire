@@ -1,0 +1,78 @@
+{
+  "bots": [
+    {
+      "name": "Stock-1",
+      "hero": "Gareth the Steadfast",
+      "class": "Knight",
+      "kind": "stock",
+      "strategy": "ma_cross",
+      "dollars": 100,
+      "max_positions": 3,
+      "watchlist": [
+        "SPY",
+        "AAPL",
+        "MSFT",
+        "JPM"
+      ],
+      "research": true
+    },
+    {
+      "name": "Stock-2",
+      "hero": "Wren of the Thicket",
+      "class": "Ranger",
+      "kind": "stock",
+      "strategy": "rsi",
+      "dollars": 100,
+      "max_positions": 3,
+      "watchlist": [
+        "QQQ",
+        "NVDA",
+        "AMD",
+        "AMZN"
+      ],
+      "research": true
+    },
+    {
+      "name": "Penny",
+      "hero": "Pip Quickfingers",
+      "class": "Rogue",
+      "kind": "penny",
+      "strategy": "breakout",
+      "dollars": 100,
+      "max_positions": 3,
+      "watchlist": [],
+      "stop_loss": 0.08,
+      "take_profit": 0.15
+    },
+    {
+      "name": "Crypto-1",
+      "hero": "Old Bram",
+      "class": "Alchemist",
+      "kind": "crypto",
+      "strategy": "ma_cross",
+      "dollars": 100,
+      "max_positions": 2,
+      "watchlist": [
+        "BTC/USD",
+        "SOL/USD",
+        "LTC/USD"
+      ],
+      "research": true
+    },
+    {
+      "name": "Crypto-2",
+      "hero": "Ysolde the Hexweaver",
+      "class": "Mage",
+      "kind": "crypto",
+      "strategy": "rsi",
+      "dollars": 100,
+      "max_positions": 2,
+      "watchlist": [
+        "ETH/USD",
+        "DOGE/USD",
+        "AVAX/USD"
+      ],
+      "research": true
+    }
+  ]
+}

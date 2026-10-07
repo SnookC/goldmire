@@ -1,0 +1,15 @@
+# Yours, never published
+.env
+bot_state.json
+bot_state.json.tmp
+bot_log.txt
+phone_link.txt
+phone_link.html
+goldmire.pid
+world/status.json
+backups/
+.venv/
+__pycache__/
+proving_grounds/
+strategies/__pycache__/
+world/reports/

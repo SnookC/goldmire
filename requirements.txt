@@ -1,0 +1,6 @@
+alpaca-py>=0.44
+python-dotenv>=1.0
+qrcode>=7.4
+pystray>=0.19
+pillow>=10
+tzdata>=2024.1

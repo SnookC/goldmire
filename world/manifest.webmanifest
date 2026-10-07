@@ -1,0 +1,17 @@
+{
+  "name": "Goldmire",
+  "short_name": "Goldmire",
+  "description": "Your paper-trading heroes and the storybook town that grows or withers with them.",
+  "id": "./world.html",
+  "start_url": "./world.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c120e",
+  "theme_color": "#0c120e",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

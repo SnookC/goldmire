@@ -1,0 +1,9 @@
+# Paste your Alpaca PAPER keys below, replacing the PASTE_... text.
+# No spaces, no quotes. Then save this file (Ctrl+S) and close it.
+# Never share this file or paste these keys anywhere else.
+
+ALPACA_API_KEY=PASTE_YOUR_API_KEY_HERE
+ALPACA_SECRET_KEY=PASTE_YOUR_SECRET_KEY_HERE
+
+# Leave this as true. The bot refuses to run otherwise.
+ALPACA_PAPER=true

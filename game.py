@@ -89,6 +89,8 @@ LINES = {
                  "After a long night with the ledgers, {r} tells {h} to watch {a}.{d}"],
     "news_exit": ["{h} hears the Town Crier's warning about {s} and gets out before the crowd ({sg}).",
                   "Bad tidings from {s}! {h} slips away while the getting is good ({sg})."],
+    "training": ["The Master-at-Arms has taught {h} {t}, proven in the Proving Grounds.",
+                 "After long days in the Proving Grounds, {h} has learned {t}."],
     "crier_good": ["The Town Crier rings his bell: \"{n}\" {r} hurries off to look into {s}.",
                    "Hear ye! \"{n}\" {r} sets out early for {s}."],
     "crier_bad": ["The Town Crier's bell tolls: \"{n}\" The guild steers clear of {s}.",
@@ -321,3 +323,9 @@ def record_news(memory, good, symbol, headline, market):
     ensure(memory)
     _say(memory, "crier_good" if good else "crier_bad", "info" if good else "loss",
          n=headline, s=symbol, r=RESEARCHERS.get(market, RESEARCHER))
+
+
+def record_training(memory, hero_name, what):
+    """A hero learned something new from the Proving Grounds."""
+    ensure(memory)
+    _say(memory, "training", "level", h=hero_name, t=what)

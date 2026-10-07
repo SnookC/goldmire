@@ -56,7 +56,8 @@ BASKET = {
     "crypto": ["BTC/USD", "ETH/USD", "SOL/USD", "DOGE/USD", "XRP/USD", "AVAX/USD", "LTC/USD", "LINK/USD"],
 }
 HISTORY_DAYS = {"15Min": 180, "1Hour": 365, "1Day": 365 * 4}
-COST = {"stock": 0.0005, "crypto": 0.0025}     # per side: fees + slippage
+COST = {"stock": 0.0005, "crypto": 0.0025, "penny": 0.002}     # per side: fees + slippage (penny spreads are wide)
+PENNY_BASKET_SIZE = 25
 TRADE_DOLLARS = 100.0
 EXAM_SHARE = 0.30
 LOOKBACK = 300                                  # bars a strategy can see (plenty for a 200-bar average)
@@ -106,7 +107,35 @@ def builtin_strategies(variants=True):
             out.append(Strategy(key if i == 0 else f"{key}@{i}", f"{names.get(key, key)} ({label})",
                                 (lambda f: lambda bars: f(bars["c"]))(fn), "15Min", rules=(fn.__doc__ or "").strip(),
                                 builtin=True, stop_loss=stop, exit_mode=mode, variant=label, base=key))
+    # Pip, the penny hero: his breakout on today's busiest $1-$5 stocks, with his old exits and new ones
+    for i, (label, stop, mode, tp) in enumerate(PENNY_VARIANTS if variants else PENNY_VARIANTS[:1]):
+        out.append(Strategy("pip" if i == 0 else f"pip@{i}", f"Pip's penny breakout ({label})",
+                            (lambda f: lambda bars: f(bars["c"]))(bot.STRATEGIES["breakout"]), "15Min", markets=("penny",),
+                            rules="Breakout hunter on penny stocks", builtin=True, stop_loss=stop, take_profit=tp,
+                            exit_mode=mode, variant=label, base="pip"))
     return out
+
+
+PENNY_VARIANTS = [("8% stop, sells at +15%", 0.08, "signal", 0.15), ("8% stop, no +15% cap", 0.08, "signal", None),
+                  ("8% stop + let winners build", 0.08, "build", None), ("smart stop + let winners build", "smart", "build", None),
+                  ("smart stop, sells at +15%", "smart", "signal", 0.15)]
+
+
+def penny_basket(key, secret, log=print):
+    """Today's busiest plain $1-$5 stocks (what Pip would be looking at), leveraged funds left out.
+    Rough on purpose: stocks that were pennies months ago but aren't now are missing."""
+    import research
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.historical.screener import ScreenerClient
+    from alpaca.data.requests import MostActivesRequest, StockLatestTradeRequest
+    from alpaca.data.enums import MostActivesBy, DataFeed
+    from alpaca.trading.client import TradingClient
+    actives = ScreenerClient(key, secret).get_most_actives(MostActivesRequest(top=100, by=MostActivesBy.VOLUME)).most_actives
+    syms = [a.symbol for a in actives if a.symbol.isalpha() and len(a.symbol) <= 5 and not (len(a.symbol) == 5 and a.symbol[-1] in "WRU")]
+    lev = research.leveraged_symbols(TradingClient(key, secret, paper=True), log)
+    trades = StockHistoricalDataClient(key, secret).get_stock_latest_trade(StockLatestTradeRequest(symbol_or_symbols=syms, feed=DataFeed.IEX))
+    out = [s for s in syms if s not in lev and s in trades and 1.0 <= float(trades[s].price) <= 5.0]
+    return out[:PENNY_BASKET_SIZE]
 
 
 def load_strategy_file(path):
@@ -193,9 +222,9 @@ def fetch_history(market, tf, log=print):
     start = datetime.now(timezone.utc) - timedelta(days=HISTORY_DAYS[tf])
     end = datetime.now(timezone.utc) - timedelta(minutes=20)     # free data plans can't see the last 15 minutes
     key, secret = _keys()
-    syms = BASKET[market]
+    syms = penny_basket(key, secret, log) if market == "penny" else BASKET[market]
     log(f"Downloading {HISTORY_DAYS[tf]} days of {tf} {market} prices for {len(syms)} symbols...")
-    if market == "stock":
+    if market in ("stock", "penny"):
         bars = StockHistoricalDataClient(key, secret).get_stock_bars(
             StockBarsRequest(symbol_or_symbols=syms, timeframe=frame, start=start, end=end, feed=DataFeed.IEX))
     else:
@@ -407,15 +436,16 @@ def run(only=None, log=print, fetch=fetch_history):
     for r in results:
         if r["builtin"]:
             if r["key"] == r["base"]:
-                r["verdict"], r["why"] = "TODAY", "how the heroes traded before stops were added"
+                r["verdict"], r["why"] = "TODAY", ("how Pip traded until now" if r["base"] == "pip" else
+                                                   "how the heroes traded before stops were added")
             else:
                 ref = today.get((r["base"], r["market"]))
                 diff = r["pl"] - (ref["pl"] if ref else 0.0)
                 if abs(diff) < 0.01:
-                    r["verdict"], r["why"] = "SAME", "same result: the stop was never reached"
+                    r["verdict"], r["why"] = "SAME", "same result: this change never came into play"
                     continue
                 r["verdict"] = "BETTER" if diff > 0 and r["exam_pl"] >= (ref["exam_pl"] if ref else 0) else "WORSE"
-                r["why"] = f"{_money(diff)} compared with no stop" + ("" if r["exam_pl"] >= (ref["exam_pl"] if ref else 0) else ", and weaker in the exam")
+                r["why"] = f"{_money(diff)} compared with " + ("how Pip traded until now" if r["base"] == "pip" else "no stop") + ("" if r["exam_pl"] >= (ref["exam_pl"] if ref else 0) else ", and weaker in the exam")
             continue
         same = [b["pl"] for b in today.values() if b["market"] == r["market"] and b["timeframe"] == r["timeframe"]]
         best = max(same) if same else max([b["pl"] for b in today.values() if b["market"] == r["market"]] or [0.0])
@@ -480,7 +510,9 @@ price). After any stop-loss, no buying that symbol back for 24 hours. The best f
 <div class="wrap"><table><thead><tr><th>Style and exit</th><th>Market</th><th class="n">Trades</th><th class="n">Wins</th>
 <th class="n">Profit</th><th class="n">Exam</th><th class="n">Avg win / loss</th><th class="n">Avg hold</th><th class="n">Worst slump</th></tr></thead>
 <tbody>{''.join(tune)}</tbody></table></div>
-<p>Past results don't guarantee future ones. A strategy that passes here goes to a hero on paper money first.</p></body></html>"""
+<p>Past results don't guarantee future ones. A strategy that passes here goes to a hero on paper money first.</p>
+<p>The penny test uses today's busiest $1&ndash;$5 stocks and replays their last 6 months. It's a rough guide: stocks that
+were pennies back then but aren't today are missing from it.</p></body></html>"""
 
 
 def main():

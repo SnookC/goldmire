@@ -118,6 +118,9 @@ THE PROVING GROUNDS: TEST A STRATEGY BEFORE A HERO USES IT  -- backtest.py
   The last 30% of history is an exam: a strategy has to make money there too.
   Verdicts: PASSES (better than what the heroes do now), PROMISING, FAILS.
   The report opens in your browser (proving_grounds/report.html).
+  Pip gets his own test: today's busiest $1-$5 stocks over the last 6 months,
+  with his old exits (8% stop, sell at +15%) against "let winners build". It's
+  a rough guide: stocks that were pennies months ago but aren't now are missing.
   Most strategies fail. That's the point: they fail here, not with your heroes.
   New strategies (for example from trading PDFs) go in the strategies folder;
   see strategies/README.txt. It already holds 19 classic strategies (Turtle,
@@ -126,6 +129,12 @@ THE PROVING GROUNDS: TEST A STRATEGY BEFORE A HERO USES IT  -- backtest.py
   Extra protection against luck: each strategy is compared with 300 make-
   believe traders who buy at random times (same number of trades, held as
   long). To pass, it must beat 95% of them.
+
+SETTINGS UPDATES
+  Sometimes an update also changes your heroes' settings (for example after a
+  Proving Grounds report). Each change is applied once, logged in bot_log.txt and
+  the town's chronicle, and your old bots.json is backed up first as
+  bots.json.before-<name>.bak. Copy it back over bots.json to undo.
 
 TEACH A HERO A NEW STRATEGY  -- promote.py
   Start menu > Goldmire - Teach a hero (or 7_teach_a_hero.bat).

@@ -1,10 +1,8 @@
 {
-  "version": "1.3.3",
+  "version": "1.4.0",
   "notes": [
-    "The Town Crier's news list shows only big stories now; routine analyst notes are left out",
-    "First update delivered through the Update button",
-    "Ride the good news: when big good news comes out about something a hero holds, it lets the run build with a trailing stop instead of selling early",
-    "Calmer Town Crier: routine analyst notes and small dips no longer count as big bad news",
-    "The Day's Ledger: an end-of-day report in the town - every trade, why it sold, and what's still held - saved each day at the close"
+    "Your heroes learn from the Proving Grounds: Wren takes up the Bollinger bounce (the strategy that passed), Gareth and Pip let winners build, Old Bram and Ysolde switch to slower daily strategies (Parabolic SAR, Ichimoku) with far fewer fees",
+    "A penny-stock test for Pip in the Proving Grounds (today's busiest $1-$5 stocks, last 6 months)",
+    "Your old hero settings are backed up as bots.json.before-2026-10-07-proving-grounds.bak"
   ]
 }

@@ -129,10 +129,58 @@ DEFAULT_BOTS = [
 ]
 
 
+# One-time changes to your heroes' settings, delivered with an update. Each is applied once,
+# after backing up bots.json (bots.json.before-<id>.bak), and only to heroes with these names.
+SETTINGS_UPDATES = [
+    ("2026-10-07-proving-grounds", "changes from the first Proving Grounds report", {
+        "Stock-2": {"strategy": "bollinger_bounce"},                     # the strategy that passed
+        "Stock-1": {"stop_loss": "smart", "exit": "build"},              # let winners build
+        "Penny": {"exit": "build", "take_profit": None},                 # no +15% cap; trail instead
+        "Crypto-1": {"strategy": "parabolic_sar"},                       # slower, daily: far fewer fees
+        "Crypto-2": {"strategy": "ichimoku_cloud"},
+    }),
+]
+TRAINING = []      # what the latest settings update changed, for the town chronicle
+
+
+def apply_settings_updates():
+    import shutil
+    try:
+        with open(BOTS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return
+    done = set(data.get("applied_updates", []))
+    pending = [u for u in SETTINGS_UPDATES if u[0] not in done]
+    if not pending:
+        return
+    for uid, title, changes in pending:
+        shutil.copy2(BOTS_FILE, BOTS_FILE + f".before-{uid}.bak")
+        for b in data.get("bots", []):
+            for k, v in changes.get(b.get("name"), {}).items():
+                if k == "strategy" and v not in STRATEGIES and v not in LEARNED:
+                    log.error(f"Settings update: [{b['name']}] strategy '{v}' isn't installed; left as {b.get('strategy')}")
+                    continue
+                old = b.get(k, "(default)")
+                if v is None:
+                    b[k] = None
+                else:
+                    b[k] = v
+                log.info(f"Settings update ({title}): [{b['name']}] {k}: {old} -> {v}")
+                TRAINING.append((b, k, v))
+        done.add(uid)
+    data["applied_updates"] = sorted(done)
+    tmp = BOTS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp, BOTS_FILE)
+
+
 def load_bots():
     if not os.path.exists(BOTS_FILE):
         with open(BOTS_FILE, "w", encoding="utf-8") as f:
-            json.dump({"bots": DEFAULT_BOTS}, f, indent=2)
+            json.dump({"bots": DEFAULT_BOTS, "applied_updates": [u[0] for u in SETTINGS_UPDATES]}, f, indent=2)
+    apply_settings_updates()
     with open(BOTS_FILE, encoding="utf-8") as f:
         bots = json.load(f)["bots"]
     for b in bots:
@@ -929,6 +977,16 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     news_client = NewsClient(key, secret)
 
     memory = load_memory()
+    taught = {}
+    for b, k, v in TRAINING:
+        h = game.hero_of(b)[0]
+        what = (f"the {STRATEGY_NAMES.get(v, v)} technique" if k == "strategy" else "letting winners build" if (k, v) == ("exit", "build")
+                else "a smart stop" if (k, v) == ("stop_loss", "smart") else None)
+        if what:
+            taught.setdefault(h, []).append(what)
+    for h, whats in taught.items():
+        game.record_training(memory, h, " and ".join(whats))
+    TRAINING.clear()
     acct = trading.get_account()
     log.info(f"Connected to PAPER account. Cash: ${float(acct.cash):,.2f}")
     for b in bots:

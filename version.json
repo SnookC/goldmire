@@ -1,15 +1,10 @@
 {
-  "version": "1.3.2",
+  "version": "1.3.3",
   "notes": [
+    "The Town Crier's news list shows only big stories now; routine analyst notes are left out",
+    "First update delivered through the Update button",
     "Ride the good news: when big good news comes out about something a hero holds, it lets the run build with a trailing stop instead of selling early",
     "Calmer Town Crier: routine analyst notes and small dips no longer count as big bad news",
-    "The Day's Ledger: an end-of-day report in the town - every trade, why it sold, and what's still held - saved each day at the close",
-    "The researchers read the news: good news lifts a pick, bad news keeps it off the list",
-    "The Town Crier checks headlines every 5 minutes: heroes sell on big bad news, researchers rush out on big good news",
-    "Researchers and Pip skip leveraged and inverse funds (2x, 3x, 'Bear' funds) that confuse every signal",
-    "Every hero has a stop-loss now (smart: sized to how jumpy each symbol is), a 24-hour cool-down after one, and an optional 'let winners build' exit",
-    "The Proving Grounds: 19 classic strategies tested on years of real prices; teach the winners to your heroes",
-    "An Update button: new versions install from the town or the tray icon, no reinstalling",
-    "The town grows from a hamlet to a market town to a city as the guild levels up"
+    "The Day's Ledger: an end-of-day report in the town - every trade, why it sold, and what's still held - saved each day at the close"
   ]
 }

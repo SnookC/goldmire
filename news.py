@@ -26,6 +26,7 @@ TIP_HOURS = 2                # good news this fresh sends the researcher out ear
 BOOST_HOURS = 72             # big good news lets a held trade "build" for this long (news drift lasts days)
 ROUNDUP = 4                  # stories naming more symbols than this are roundups ("10 stocks moving...")
 CRIER_SIZE = 10              # headlines kept for the town crier
+CRIER_TONE = 3               # only big stories make the crier's list (routine analyst notes don't)
 
 _POS = {
     3: ["beats estimates", "beat estimates", "tops estimates", "topped estimates", "beats expectations", "tops expectations",
@@ -209,7 +210,7 @@ def watch(news_client, memory, log, now=None):
     tips, alarms = {"stock": [], "crypto": []}, []
     for st in reversed(fresh):                      # oldest first, so the crier reads in order
         age = (now - _aware(st["time"])).total_seconds() / 3600
-        if abs(st["tone"]) >= 2 and not st["roundup"]:
+        if abs(st["tone"]) >= CRIER_TONE and not st["roundup"]:
             desk["crier"].insert(0, {"time": st["time"], "symbols": [to_trade_symbol(s) for s in st["symbols"]][:3],
                                      "headline": short(st["headline"], 110), "tone": st["tone"]})
         if st["roundup"]:
@@ -225,7 +226,7 @@ def watch(news_client, memory, log, now=None):
                 if age <= TIP_HOURS:
                     tips["crypto" if is_crypto(raw) else "stock"].append((sym, st))
     desk["seen"] = ([s["id"] for s in fresh] + desk["seen"])[:400]
-    desk["crier"] = desk["crier"][:CRIER_SIZE]
+    desk["crier"] = [c for c in desk["crier"] if abs(c.get("tone", 0)) >= CRIER_TONE][:CRIER_SIZE]
     for k, a in list(desk["alarms"].items()):       # alarms fade after a few hours
         if (now - _aware(a["time"])).total_seconds() > ALARM_HOURS * 3600:
             desk["alarms"].pop(k)

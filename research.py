@@ -179,13 +179,25 @@ def scan_size(bot):
 MAJOR_EXCHANGES = {"NYSE", "NASDAQ", "AMEX", "ARCA", "NYSEARCA", "BATS"}
 
 
-def busiest_stocks(trading, stock_data, memory, log, n=300):
-    """The n busiest plain US stocks ($5+, can be bought in fractions, no leveraged/inverse funds),
-    ranked by yesterday's dollars traded. Worked out once a day and kept in memory."""
+MIDDAY = (12, 45)     # New York time, halfway through the trading day (9:30 AM - 4:00 PM)
+
+
+def scan_slot(now=None):
+    """Which of the day's two scans is due: 'open' (ranked by yesterday's trading) until
+    12:45 PM New York time, then 'midday' (ranked by today's trading so far)."""
+    import report
+    t = report.ny(now)
+    return t.strftime("%Y-%m-%d"), ("midday" if (t.hour, t.minute) >= MIDDAY else "open")
+
+
+def busiest_stocks(trading, stock_data, memory, log, n=300, now=None):
+    """The n busiest plain US stocks ($5+, can be bought in fractions, no leveraged/inverse funds).
+    Scanned twice a day: at the open (by yesterday's dollars traded) and at midday (by today's
+    dollars traded so far). Kept in memory between scans."""
     rs = memory.setdefault("research", {})
-    today = datetime.now().date().isoformat()
+    today, slot = scan_slot(now)
     cached = rs.get("busiest") or {}
-    if cached.get("day") == today and len(cached.get("list", [])) >= min(n, 50):
+    if cached.get("day") == today and cached.get("slot") == slot and len(cached.get("list", [])) >= min(n, 50):
         return cached["list"][:n]
     from alpaca.trading.requests import GetAssetsRequest
     from alpaca.trading.enums import AssetClass
@@ -212,7 +224,10 @@ def busiest_stocks(trading, stock_data, memory, log, n=300):
             log(f"prices unavailable for some stocks ({e})")
             continue
         for sym, sn in (snaps or {}).items():
-            bar = getattr(sn, "previous_daily_bar", None) or getattr(sn, "daily_bar", None)
+            if slot == "midday":       # today's trading so far
+                bar = getattr(sn, "daily_bar", None) or getattr(sn, "previous_daily_bar", None)
+            else:                      # at the open today has barely started: use yesterday
+                bar = getattr(sn, "previous_daily_bar", None) or getattr(sn, "daily_bar", None)
             if not bar:
                 continue
             price, vol = float(bar.close or 0), float(bar.volume or 0)
@@ -220,8 +235,9 @@ def busiest_stocks(trading, stock_data, memory, log, n=300):
                 volume[sym] = price * vol
     ranked = sorted(volume, key=volume.get, reverse=True)
     if ranked:
-        rs["busiest"] = {"day": today, "list": ranked[:max(n, 300)]}
-        log(f"ranked {len(ranked)} stocks by dollars traded; the busiest are {', '.join(ranked[:5])}")
+        rs["busiest"] = {"day": today, "slot": slot, "list": ranked[:max(n, 300)]}
+        log(f"{'midday' if slot == 'midday' else 'opening'} scan: ranked {len(ranked)} stocks by dollars traded "
+            f"{'today so far' if slot == 'midday' else 'yesterday'}; the busiest are {', '.join(ranked[:5])}")
         return ranked[:n]
     return cached.get("list", [])[:n]
 
@@ -263,7 +279,7 @@ def pick_watchlists(bots, studies, news_counts, held, previous, market=None, bus
                 if sym in claimed or sym in keep or news_info(news_counts.get(sym))["tone"] <= AVOID_TONE:
                     continue
                 picks.append(sym)
-                reasons[sym] = f"#{rank} busiest stock today"
+                reasons[sym] = f"#{rank} busiest stock ({'midday' if scan_slot()[1] == 'midday' else 'opening'} scan)"
                 claimed.add(sym)
             new = keep + picks
             prev = previous.get(name, [])

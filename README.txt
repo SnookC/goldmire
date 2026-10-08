@@ -201,6 +201,13 @@ THE DAY'S LEDGER: YOUR END-OF-DAY REPORT  -- report.py
   bad news, its style said sell...), what's still held and how it moved
   today, and anything closed outside Goldmire.
   Reports are kept in the world/reports folder.
+  To hand a day off (to Claude, or anyone): page to that day, then at the
+  bottom of the ledger click
+    Spreadsheet  - downloads goldmire-ledger-<date>.csv (opens in Excel)
+    PDF          - opens the print window; pick "Save as PDF" as the printer
+  Both list every buy and sell that day (time, hero, symbol, prices, amount,
+  result and why it sold) and what's still held. Days saved before version
+  1.4.2 show their sells only; buys are listed from 1.4.2 on.
 
 UPDATES (no reinstalling)
   When a new version of Goldmire is out, a gold "Update ready" button

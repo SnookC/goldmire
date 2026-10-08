@@ -86,7 +86,7 @@ def build(memory, bots, positions=None, account=None, day=None, norm=lambda s: s
             closed.append({**row, "pl": pl, "paid": e.get("paid"), "sold": e.get("price"), "cost": e.get("cost"),
                            "why": why_kind(e.get("reason")), "reason": e.get("reason", "")})
         elif e.get("side") == "buy":
-            opened.append({**row, "dollars": e.get("dollars")})
+            opened.append({**row, "dollars": e.get("dollars"), "price": e.get("price")})
         elif e.get("side") == "gone":
             gone.append({**row, "note": e.get("note", "")})
     holding = []
@@ -115,7 +115,7 @@ def build(memory, bots, positions=None, account=None, day=None, norm=lambda s: s
         d["holding"] = d.get("holding", 0) + 1
     rep = {
         "day": day, "made": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "closed": sorted(closed, key=lambda c: c["time"]), "bought": len(opened), "gone": gone,
+        "closed": sorted(closed, key=lambda c: c["time"]), "bought": len(opened), "buys": sorted(opened, key=lambda c: c["time"]), "gone": gone,
         "holding": sorted(holding, key=lambda h: (h["hero"], h["symbol"])), "has_holdings": positions is not None,
         "closed_pl": closed_pl, "wins": len(wins), "losses": len(closed) - len(wins),
         "open_pl": round(sum(h["pl"] for h in holding), 2), "open_today": round(sum(h["today"] for h in holding), 2),

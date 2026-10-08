@@ -1,8 +1,7 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "notes": [
-    "Pip is benched after the penny test: no new buys, and what he holds is sold by his normal rules. He stays in town until a penny technique passes the Proving Grounds",
-    "Your heroes learn from the Proving Grounds: Wren takes up the Bollinger bounce (the strategy that passed), Gareth and Pip let winners build, Old Bram and Ysolde switch to slower daily strategies (Parabolic SAR, Ichimoku) with far fewer fees",
-    "A penny-stock test for Pip in the Proving Grounds (today's busiest $1-$5 stocks, last 6 months)"
+    "Export the Day's Ledger: two new buttons at the bottom of the ledger, Spreadsheet (a .csv file that opens in Excel) and PDF (a clean printout: choose \"Save as PDF\"), listing every buy and sell that day plus what's still held",
+    "Each day's report now lists the buys too (amount and price), not just how many"
   ]
 }

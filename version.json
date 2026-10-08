@@ -1,6 +1,7 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "notes": [
+    "Wren's 300-stock scan runs twice a day: at the opening bell (busiest yesterday) and at midday, 11:45 AM Central (busiest today so far)",
     "More trading: Wren now scans the 300 busiest stocks every day for Bollinger bounce setups, instead of a list of 6",
     "More slots: Gareth can hold up to 12 trades, Wren 15, the crypto heroes and Pip 10. Each hero still has its own $100 pot",
     "Heroes size each trade by risk: every trade risks about 75 cents of the pot, so calm stocks get more money and wild ones less (between $5 and $30)",

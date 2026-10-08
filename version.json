@@ -1,7 +1,9 @@
 {
-  "version": "1.4.2",
+  "version": "1.4.3",
   "notes": [
-    "Export the Day's Ledger: two new buttons at the bottom of the ledger, Spreadsheet (a .csv file that opens in Excel) and PDF (a clean printout: choose \"Save as PDF\"), listing every buy and sell that day plus what's still held",
-    "Each day's report now lists the buys too (amount and price), not just how many"
+    "More trading: Wren now scans the 300 busiest stocks every day for Bollinger bounce setups, instead of a list of 6",
+    "More slots: Gareth can hold up to 12 trades, Wren 15, the crypto heroes and Pip 10. Each hero still has its own $100 pot",
+    "Heroes size each trade by risk: every trade risks about 75 cents of the pot, so calm stocks get more money and wild ones less (between $5 and $30)",
+    "The Day's Ledger export drops the brackets around each sale's reason"
   ]
 }

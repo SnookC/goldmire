@@ -36,12 +36,26 @@ def trade_size(memory, bot):
     return round(_acct(memory, bot)["pot"], 2)
 
 
-def slot_size(memory, bot, committed=0.0):
-    """Dollars for ONE new position: the pot split into max_positions equal slots,
-    never more than what isn't already in other open positions."""
+RISK_PER_TRADE = 0.0075    # "sizing": "risk" -> each trade risks 0.75% of the pot if its stop-loss is hit
+MAX_SHARE = 0.30           # ...and never puts more than 30% of the pot into one trade
+
+
+def slot_size(memory, bot, committed=0.0, stop=None):
+    """Dollars for ONE new position, never more than what isn't already in other open positions.
+
+    "sizing": "split" (the default): the pot split into max_positions equal slots.
+    "sizing": "risk": the hero sizes each trade by how far away its stop-loss is, so every
+    trade risks the same small slice of the pot (RISK_PER_TRADE, or the hero's own "risk").
+    A calm stock with a tight stop gets more money, a wild one with a wide stop gets less.
+    max_positions is then just the most trades open at once; they don't all have to be used."""
     pot = _acct(memory, bot)["pot"]
+    free = max(0.0, pot - committed)
+    if bot.get("sizing") == "risk" and stop:
+        want = pot * float(bot.get("risk", RISK_PER_TRADE)) / float(stop)
+        want = min(want, pot * MAX_SHARE)
+        return round(max(0.0, min(max(want, MIN_TRADE), free)), 2)
     slots = max(1, int(bot.get("max_positions", 1)))
-    return round(max(0.0, min(pot / slots, pot - committed)), 2)
+    return round(max(0.0, min(pot / slots, free)), 2)
 
 
 def can_trade(memory, bot):

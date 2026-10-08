@@ -168,6 +168,64 @@ def score(style, s, news=None):
     return pts, why
 
 
+def scan_size(bot):
+    """How many of the busiest stocks a scanning hero watches ("scan": 300 in bots.json), else 0."""
+    try:
+        return max(0, int(bot.get("scan") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+MAJOR_EXCHANGES = {"NYSE", "NASDAQ", "AMEX", "ARCA", "NYSEARCA", "BATS"}
+
+
+def busiest_stocks(trading, stock_data, memory, log, n=300):
+    """The n busiest plain US stocks ($5+, can be bought in fractions, no leveraged/inverse funds),
+    ranked by yesterday's dollars traded. Worked out once a day and kept in memory."""
+    rs = memory.setdefault("research", {})
+    today = datetime.now().date().isoformat()
+    cached = rs.get("busiest") or {}
+    if cached.get("day") == today and len(cached.get("list", [])) >= min(n, 50):
+        return cached["list"][:n]
+    from alpaca.trading.requests import GetAssetsRequest
+    from alpaca.trading.enums import AssetClass
+    from alpaca.data.requests import StockSnapshotRequest
+    from alpaca.data.enums import DataFeed
+    try:
+        assets = trading.get_all_assets(GetAssetsRequest(asset_class=AssetClass.US_EQUITY))
+    except Exception as e:  # noqa: BLE001
+        log(f"stock list unavailable ({e}); keeping the last busiest list")
+        return cached.get("list", [])[:n]
+    def exch(a):
+        return str(getattr(getattr(a, "exchange", ""), "value", getattr(a, "exchange", ""))).upper()
+    def stat(a):
+        return str(getattr(getattr(a, "status", ""), "value", getattr(a, "status", ""))).lower()
+    syms = sorted(a.symbol for a in assets
+                  if getattr(a, "tradable", False) and getattr(a, "fractionable", False) and stat(a) == "active"
+                  and exch(a) in MAJOR_EXCHANGES and _plain_stock(a.symbol) and not is_leveraged_name(getattr(a, "name", "")))
+    volume = {}
+    for i in range(0, len(syms), 200):
+        chunk = syms[i:i + 200]
+        try:
+            snaps = stock_data.get_stock_snapshot(StockSnapshotRequest(symbol_or_symbols=chunk, feed=DataFeed.IEX))
+        except Exception as e:  # noqa: BLE001 - skip a chunk rather than fail the whole scan
+            log(f"prices unavailable for some stocks ({e})")
+            continue
+        for sym, sn in (snaps or {}).items():
+            bar = getattr(sn, "previous_daily_bar", None) or getattr(sn, "daily_bar", None)
+            if not bar:
+                continue
+            price, vol = float(bar.close or 0), float(bar.volume or 0)
+            if price >= MIN_PRICE and vol > 0:
+                volume[sym] = price * vol
+    ranked = sorted(volume, key=volume.get, reverse=True)
+    if ranked:
+        rs["busiest"] = {"day": today, "list": ranked[:max(n, 300)]}
+        log(f"ranked {len(ranked)} stocks by dollars traded; the busiest are {', '.join(ranked[:5])}")
+        return ranked[:n]
+    return cached.get("list", [])[:n]
+
+
 def market_of(bot):
     """'stock' or 'crypto' for researched kinds, None for penny bots (they find their own)."""
     return {"stock": "stock", "crypto": "crypto"}.get(bot.get("kind"))
@@ -177,7 +235,7 @@ def is_researched(bot):
     return bool(bot.get("research", True)) and market_of(bot) is not None
 
 
-def pick_watchlists(bots, studies, news_counts, held, previous, market=None):
+def pick_watchlists(bots, studies, news_counts, held, previous, market=None, busiest=None):
     """Decide the new watchlist of each researched bot (only bots in `market`, if given).
 
     bots      : bot configs (dicts from bots.json)
@@ -196,6 +254,22 @@ def pick_watchlists(bots, studies, news_counts, held, previous, market=None):
         name, mk = b["name"], market_of(b)
         keep = list(dict.fromkeys(held.get(name, []) + b.get("pinned", [])))
         reasons = {s: ("holding it now" if s in held.get(name, []) else "pinned by you") for s in keep}
+        if scan_size(b) and mk == "stock" and busiest:
+            # a scanning hero watches the N busiest stocks and lets its own technique pick the moment
+            picks = []
+            for rank, sym in enumerate(busiest, 1):
+                if len(picks) >= max(0, scan_size(b) - len(keep)):
+                    break
+                if sym in claimed or sym in keep or news_info(news_counts.get(sym))["tone"] <= AVOID_TONE:
+                    continue
+                picks.append(sym)
+                reasons[sym] = f"#{rank} busiest stock today"
+                claimed.add(sym)
+            new = keep + picks
+            prev = previous.get(name, [])
+            out[name] = {"watchlist": new, "reasons": {s: reasons[s] for s in new}, "scan": True,
+                         "added": [s for s in new if s not in prev], "dropped": [s for s in prev if s not in new], "avoided": {}}
+            continue
         ranked, avoided = [], {}
         for sym, st in studies.get(mk, {}).items():
             if sym in claimed:
@@ -332,11 +406,15 @@ def run(market, trading, stock_data, crypto_data, screener, news_client, bots, m
     rs = _research_memory(memory)
     mine = [b for b in bots if is_researched(b) and market_of(b) == market]
     previous = {b["name"]: rs["lists"].get(b["name"], b.get("watchlist", [])) for b in mine}
-    for lst in previous.values():        # always re-check what's already on the lists (minus leveraged funds)
-        leads |= {s for s in lst if market != "stock" or s not in leveraged_symbols(trading, log)}
+    for b in mine:                       # always re-check what's already on the lists (minus leveraged funds);
+        if scan_size(b):                 # a scanning hero's long list isn't studied, its technique does the picking
+            continue
+        leads |= {s for s in previous[b["name"]] if market != "stock" or s not in leveraged_symbols(trading, log)}
     studies = {market: study_market(market, data_client, leads, log)}
     held = {b["name"]: list(memory.get("held", {}).get(b["name"], {})) for b in bots}
-    picks = pick_watchlists(bots, studies, news, held, previous, market=market)
+    widest = max([scan_size(b) for b in mine] + [0])
+    busiest = busiest_stocks(trading, stock_data, memory, log, widest) if market == "stock" and widest else None
+    picks = pick_watchlists(bots, studies, news, held, previous, market=market, busiest=busiest)
     for name, p in picks.items():
         rs["lists"][name] = p["watchlist"]
         rs["reasons"][name] = p["reasons"]

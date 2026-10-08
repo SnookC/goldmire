@@ -21,15 +21,30 @@ RUNNING IN THE BACKGROUND (no black window)
   Only one Goldmire can run at a time, so trades never happen twice.
 
 THE BOTS (all in bots.json)
-  Stock-1   Gareth (Knight)    trend follower   holds up to 3 stocks
-  Stock-2   Wren (Ranger)      dip buyer        holds up to 3 stocks
-  Penny     Pip (Rogue)        breakout hunter  holds up to 3 penny stocks it finds itself
-  Crypto-1  Old Bram (Alchem.) trend follower   holds up to 2 coins
-  Crypto-2  Ysolde (Mage)      dip buyer        holds up to 2 coins
+  Stock-1   Gareth (Knight)    trend follower    up to 12 trades open at once
+  Stock-2   Wren (Ranger)      Bollinger bounce  up to 15, scanning the 300 busiest stocks
+  Penny     Pip (Rogue)        breakout hunter   up to 10 (benched for now)
+  Crypto-1  Old Bram (Alchem.) Parabolic SAR     up to 10 coins
+  Crypto-2  Ysolde (Mage)      Ichimoku cloud    up to 10 coins
   The watchlists in bots.json are only starting ideas: the researchers replace them.
 
-  * Each bot can hold several stocks at once ("max_positions").
-  * Its pot is split into equal slots, one per holding.
+  * Each hero has its own pot (it starts at $100) and can hold several trades at
+    once ("max_positions"). It doesn't have to fill every slot.
+  * HOW MUCH EACH TRADE SPENDS ("sizing": "risk"): every trade risks the same
+    small slice of the pot, about 75 cents of $100, if it goes wrong. A calm
+    stock with a tight stop-loss gets more money; a wild one gets less:
+        stop 2% away  -> $30 (the most: 30% of the pot)
+        stop 4% away  -> $18.75
+        stop 10% away -> $7.50
+        stop 15% away -> $5 (the least)
+    A technique with no stop-loss (Wren's) uses how jumpy the stock is instead.
+    Buying stops when the pot is spent, so a hero usually holds 4 to 10 trades.
+    Change the slice with "risk": 0.01 (1%) in bots.json; "sizing": "split"
+    goes back to splitting the pot into equal slots.
+  * "scan": 300 (stock heroes) - instead of a short researched list, the hero
+    watches the 300 busiest stocks ($5+, no leveraged funds), worked out every
+    morning from yesterday's dollars traded, and buys only when its technique
+    says so. The town shows just what it buys, not the 300.
   * Two bots never hold the same stock at the same time.
   * Positions you open by hand in Alpaca are left alone.
   * Stock and penny bots trade while the US market is open; crypto bots 24/7.

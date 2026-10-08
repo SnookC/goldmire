@@ -142,6 +142,13 @@ SETTINGS_UPDATES = [
     ("2026-10-07-bench-pip", "Pip benched after the penny test (no new buys; holdings sold by his rules)", {
         "Penny": {"benched": True},
     }),
+    ("2026-10-08-wider-nets", "more slots, trades sized by risk, Wren scans the 300 busiest stocks", {
+        "Stock-1": {"max_positions": 12, "sizing": "risk"},
+        "Stock-2": {"max_positions": 15, "sizing": "risk", "scan": 300},
+        "Penny": {"max_positions": 10, "sizing": "risk"},
+        "Crypto-1": {"max_positions": 10, "sizing": "risk"},
+        "Crypto-2": {"max_positions": 10, "sizing": "risk"},
+    }),
 ]
 TRAINING = []      # what the latest settings update changed, for the town chronicle
 
@@ -208,6 +215,10 @@ def check_config(bots):
             problems.append(f"[{n}] dollars must be a number above 0")
         if not isinstance(b.get("max_positions"), int) or b["max_positions"] < 1:
             problems.append(f"[{n}] max_positions must be 1 or more")
+        if b.get("sizing", "split") not in ("split", "risk"):
+            problems.append(f"[{n}] sizing must be \"split\" or \"risk\"")
+        if b.get("scan") and (b.get("kind") != "stock" or not isinstance(b["scan"], int) or not 10 <= b["scan"] <= 1000):
+            problems.append(f"[{n}] scan is for stock heroes: a number from 10 to 1000")
         if b.get("kind") in ("stock", "crypto") and not b["watchlist"] and not b.get("research", True):
             problems.append(f"[{n}] needs at least one symbol in its watchlist (or turn research on)")
         if b.get("kind") == "crypto" and any("/" not in s for s in b["watchlist"]):
@@ -314,6 +325,7 @@ for _k, _st in LEARNED.items():
     research.STYLES[_k] = _st.style
 TIMEFRAME_SECONDS = {"15Min": 900, "1Hour": 3600, "1Day": 86400}
 HISTORY_FOR = {"15Min": 20, "1Hour": 70, "1Day": 460}     # calendar days of bars to fetch (~300 bars)
+_DAILY_BARS = {}           # (kind, symbol) -> (New York date, finished daily bars), shared by every round that day
 
 
 # ---------------------------------------------------------------------------
@@ -351,20 +363,30 @@ class Round:
         from alpaca.data.enums import DataFeed
         symbols = [s for s in symbols if s]
         cache = self.__dict__.setdefault("_bars", {})
+        if timeframe == "1Day":                   # finished daily bars only change once a day: keep them all day
+            stamp = report.ny().strftime("%Y-%m-%d")
+            for s in symbols:
+                kept = _DAILY_BARS.get((kind, s))
+                if kept and kept[0] == stamp:
+                    cache.setdefault((s, timeframe), kept[1])
         need = [s for s in symbols if (s, timeframe) not in cache]
         if need:
             tf = {"15Min": TimeFrame(15, TimeFrameUnit.Minute), "1Hour": TimeFrame.Hour, "1Day": TimeFrame.Day}[timeframe]
             start = datetime.now(timezone.utc) - timedelta(days=HISTORY_FOR[timeframe])
-            if kind == "crypto":
-                got = self.crypto_data.get_crypto_bars(CryptoBarsRequest(symbol_or_symbols=need, timeframe=tf, start=start))
-            else:
-                got = self.stock_data.get_stock_bars(StockBarsRequest(symbol_or_symbols=need, timeframe=tf, start=start, feed=DataFeed.IEX))
-            now = datetime.now(timezone.utc)
-            for s in need:
-                rows = [r for r in got.data.get(s, []) if (now - r.timestamp).total_seconds() >= TIMEFRAME_SECONDS[timeframe]]
-                cache[(s, timeframe)] = {"o": [float(r.open) for r in rows], "h": [float(r.high) for r in rows],
-                                         "l": [float(r.low) for r in rows], "c": [float(r.close) for r in rows],
-                                         "v": [float(r.volume or 0) for r in rows], "t": [r.timestamp for r in rows]}
+            for i in range(0, len(need), 100):    # 100 symbols per request
+                part = need[i:i + 100]
+                if kind == "crypto":
+                    got = self.crypto_data.get_crypto_bars(CryptoBarsRequest(symbol_or_symbols=part, timeframe=tf, start=start))
+                else:
+                    got = self.stock_data.get_stock_bars(StockBarsRequest(symbol_or_symbols=part, timeframe=tf, start=start, feed=DataFeed.IEX))
+                now = datetime.now(timezone.utc)
+                for s in part:
+                    rows = [r for r in got.data.get(s, []) if (now - r.timestamp).total_seconds() >= TIMEFRAME_SECONDS[timeframe]]
+                    cache[(s, timeframe)] = {"o": [float(r.open) for r in rows], "h": [float(r.high) for r in rows],
+                                             "l": [float(r.low) for r in rows], "c": [float(r.close) for r in rows],
+                                             "v": [float(r.volume or 0) for r in rows], "t": [r.timestamp for r in rows]}
+                    if timeframe == "1Day":
+                        _DAILY_BARS[(kind, s)] = (report.ny().strftime("%Y-%m-%d"), cache[(s, timeframe)])
         return {s: cache.get((s, timeframe), {"o": [], "h": [], "l": [], "c": [], "v": [], "t": []}) for s in symbols}
 
 
@@ -592,6 +614,8 @@ def run_bot(bot, rnd, memory):
         return
     committed = sum(h["cost"] for h in held.values())
     size = bank.slot_size(memory, bot, committed)
+    if bot.get("sizing") == "risk":           # sized per trade below; here just: is there money left?
+        size = round(bank.trade_size(memory, bot) - committed, 2)
     if size < bank.MIN_TRADE:
         if not held:
             log.info(f"[{name}] benched: pot too small to trade")
@@ -629,16 +653,23 @@ def run_bot(bot, rnd, memory):
             c = closes.get(sym, [])
             if strategy(c) != "buy":
                 continue
+        mk, tf = "crypto" if kind == "crypto" else "stock", LEARNED[bot["strategy"]].timeframe if strategy is None else "15Min"
+        stop = exits.stop_fraction(bot.get("stop_loss", exits.DEFAULT_STOP), c, mk, tf)
+        # risk sizing measures risk by the stop, or (a technique without a stop) by how jumpy the stock is
+        risk = stop or exits.stop_fraction("smart", c, mk, tf)
+        size = bank.slot_size(memory, bot, committed, risk)
+        if size < bank.MIN_TRADE:
+            break                                 # the pot is spent
+        if bot.get("sizing") == "risk" and risk:
+            log.info(f"[{name}] {sym}: {'stop' if stop else 'a typical bad move'} is {risk:.1%}, so ${size:,.2f} risks about ${size * risk:,.2f} of the pot")
         if place_buy(rnd, bot, memory, sym, size, prices.get(sym) or (c[-1] if c else None)):
             h = held_by(memory, bot)[sym]
-            h["stop"] = exits.stop_fraction(bot.get("stop_loss", exits.DEFAULT_STOP), c, "crypto" if kind == "crypto" else "stock",
-                                            LEARNED[bot["strategy"]].timeframe if strategy is None else "15Min")
+            h["stop"] = stop
             h["peak"] = c[-1] if c else None
             save_memory(memory)
             bought += 1
-            committed += size
-            size = bank.slot_size(memory, bot, committed)
-            if bought >= free_slots or size < bank.MIN_TRADE:
+            committed += h.get("cost", size)
+            if bought >= free_slots:
                 break
     if not bought:
         shown = ", ".join(candidates[:6]) + ("..." if len(candidates) > 6 else "")
@@ -687,11 +718,12 @@ def build_status(positions, memory, market_open, bots):
         unrealized = round(sum(p["pl"] for p in pos_list), 2)
         out.append({
             "name": b["name"], "kind": b["kind"], "strategy": b["strategy"], "benched": bool(b.get("benched")),
-            "strategy_name": STRATEGY_NAMES[b["strategy"]], "watchlist": wl,
+            "strategy_name": STRATEGY_NAMES[b["strategy"]], "watchlist": [] if research.scan_size(b) else wl,
+            "scan": research.scan_size(b), "scanning": len(wl) if research.scan_size(b) else 0,
             "researched": research.is_researched(b),
-            "reasons": rs.get("reasons", {}).get(b["name"], {}),
+            "reasons": {} if research.scan_size(b) else rs.get("reasons", {}).get(b["name"], {}),
             "max_positions": b["max_positions"], "positions": pos_list, "holding": bool(pos_list),
-            "symbol": ", ".join(p["symbol"] for p in pos_list) or ("penny stocks" if b["kind"] == "penny" else ", ".join(wl[:3])),
+            "symbol": ", ".join(p["symbol"] for p in pos_list) or ("penny stocks" if b["kind"] == "penny" else f"the {len(wl)} busiest stocks" if research.scan_size(b) else ", ".join(wl[:3])),
             "realized_pl": realized, "unrealized_pl": unrealized, "pl": round(realized + unrealized, 2),
             "hero": game.hero_block(memory, b), "bank": bank.status(memory, b), "dollars": bank.trade_size(memory, b),
         })
@@ -936,6 +968,10 @@ def run_research(market, trading, stock_data, crypto_data, screener, news_client
         p = picks.get(b["name"])
         if not p:
             continue
+        if p.get("scan"):                         # a 300-stock list: a summary, not every name
+            log.info(f"{who}: [{b['name']}] scanning the {len(p['watchlist'])} busiest stocks "
+                     f"({', '.join(p['watchlist'][:8])}...), {len(p['added'])} new today, {len(p['dropped'])} dropped")
+            continue                              # the town only hears about what she actually buys
         log.info(f"{who}: [{b['name']}] watchlist -> {', '.join(p['watchlist']) or '(nothing fits today)'}")
         for sym in p["added"]:
             log.info(f"    + {sym}: {p['reasons'].get(sym, '')}")
@@ -988,14 +1024,18 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     for b, k, v in TRAINING:
         h = game.hero_of(b)[0]
         what = (f"the {STRATEGY_NAMES.get(v, v)} technique" if k == "strategy" else "letting winners build" if (k, v) == ("exit", "build")
-                else "a smart stop" if (k, v) == ("stop_loss", "smart") else None)
+                else "a smart stop" if (k, v) == ("stop_loss", "smart")
+                else f"juggling up to {v} trades at once" if k == "max_positions"
+                else "sizing each trade by its risk" if (k, v) == ("sizing", "risk")
+                else f"scanning the {v} busiest stocks" if k == "scan" else None)
         if (k, v) == ("benched", True):
             game.record_bench(memory, h)
             continue
         if what:
-            taught.setdefault(h, []).append(what)
-    for h, whats in taught.items():
-        game.record_training(memory, h, " and ".join(whats))
+            taught.setdefault((h, k in ("max_positions", "sizing", "scan")), []).append(what)
+    for (h, orders), whats in taught.items():
+        joined = ", ".join(whats[:-1]) + (" and " if len(whats) > 1 else "") + whats[-1]
+        (game.record_orders if orders else game.record_training)(memory, h, joined)
     TRAINING.clear()
     acct = trading.get_account()
     log.info(f"Connected to PAPER account. Cash: ${float(acct.cash):,.2f}")

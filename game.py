@@ -91,6 +91,8 @@ LINES = {
                   "Bad tidings from {s}! {h} slips away while the getting is good ({sg})."],
     "training": ["The Master-at-Arms has taught {h} {t}, proven in the Proving Grounds.",
                  "After long days in the Proving Grounds, {h} has learned {t}."],
+    "orders": ["By order of the Guildmaster, {h} takes up {t}.",
+               "New orders from the Guildmaster: {h} is {t}."],
     "bench": ["{h} takes a seat on the bench by the tavern door. The guild will call on them again once a better penny technique is proven.",
               "The Guildmaster benches {h} until the Proving Grounds find a penny technique worth trusting."],
     "crier_good": ["The Town Crier rings his bell: \"{n}\" {r} hurries off to look into {s}.",
@@ -331,6 +333,12 @@ def record_training(memory, hero_name, what):
     """A hero learned something new from the Proving Grounds."""
     ensure(memory)
     _say(memory, "training", "level", h=hero_name, t=what)
+
+
+def record_orders(memory, hero_name, what):
+    """You changed how a hero works (more slots, sizing, a wider scan)."""
+    ensure(memory)
+    _say(memory, "orders", "info", h=hero_name, t=what)
 
 
 def record_bench(memory, hero_name):

@@ -50,6 +50,10 @@ header { display: flex; flex-wrap: wrap; justify-content: space-between; align-i
 .treasury { text-align: right; }
 .treasury .g { font-family: var(--display); font-weight: 700; font-size: clamp(24px, 5.5vw, 32px); line-height: 1; }
 .treasury .usd { font-size: 12.5px; color: var(--muted); }
+.areas { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-bottom: 6px; }
+.areas span { border: 1px solid #3a4532; border-radius: 999px; background: #12180f; padding: 3px 10px; font-size: 13px; white-space: nowrap; }
+.areas span small { color: var(--muted); font-size: 11.5px; margin-right: 5px; text-transform: uppercase; letter-spacing: .05em; }
+.areas span b { font-weight: 700; }
 .bar { height: 8px; border-radius: 99px; background: #0a0f0b; border: 1px solid var(--line); overflow: hidden; }
 .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #a7782d, var(--gilt), var(--gilt-hi)); border-radius: 99px; transition: width .6s ease; }
 .xpline { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
@@ -245,7 +249,7 @@ footer { font-size: 12.5px; color: var(--muted); }
     <div class="guild">
       <div class="row1">
         <div class="gm">Guildmaster · <b id="gtitle">Village Upstart</b></div>
-        <div class="treasury"><div class="g num flat" id="gold">+$0.00</div><div class="usd num" id="usd">total profit</div><div class="usd num" id="vault">Vault: $0 saved</div></div>
+        <div class="treasury"><div class="areas num" id="areas" aria-label="Profit by area"></div><div class="g num flat" id="gold">+$0.00</div><div class="usd num" id="usd">total profit</div><div class="usd num" id="vault">Vault: $0 saved</div></div>
       </div>
       <div class="bar" aria-hidden="true"><i id="gbar"></i></div>
       <div class="xpline num"><span id="glevel">Guild level 1</span><span id="gxp">0 / 100 XP</span></div>
@@ -544,7 +548,11 @@ footer { font-size: 12.5px; color: var(--muted); }
     const g = state.game; if (!g) return;
     $("era").textContent = `${STAGES[stageOf()].replace(/^a/, "A")} · ${eraName()}`; $("gtitle").textContent = g.guild.title;
     const gold = $("gold"); gold.textContent = usd(state.total); gold.className = "g num " + cls(state.total);
-    $("usd").textContent = state.total < 0 ? "total loss" : "total profit";
+    $("usd").textContent = state.total < 0 ? "total loss, all areas" : "total profit, all areas";
+    const area = k => state.bots.filter(b => (b.kind || "stock") === k).reduce((a, b) => a + (+b.pl || 0), 0);
+    $("areas").innerHTML = [["Stocks", "stock"], ["Penny", "penny"], ["Crypto", "crypto"]]
+      .filter(([, k]) => state.bots.some(b => b.kind === k))
+      .map(([label, k]) => { const v = area(k); return `<span title="${label}: every ${label === "Penny" ? "penny-stock" : label.toLowerCase()} hero's profit, closed and open"><small>${label}</small><b class="${cls(v)}">${usd(v)}</b></span>`; }).join("");
     $("vault").textContent = "Vault: " + money(state.bots.reduce((a, b) => a + (b.bank?.savings || 0), 0)) + " saved";
     const gl = g.guild.level, lo = gl > 1 ? needFor(gl - 1) : 0, hi = needFor(gl);
     $("gbar").style.width = clamp((g.guild.xp - lo) / (hi - lo) * 100, 0, 100) + "%";

@@ -1,6 +1,6 @@
 {
-  "version": "1.4.6",
+  "version": "1.4.7",
   "notes": [
-    "A Bench button on every hero card: bench any hero at any time (no new trades; what they hold is still sold by their normal rules), and send them back to work with one click"
+    "Profit by area at the top of the town: Stocks, Penny and Crypto each get their own total (closed and open trades), next to the grand total, so you can see which area needs tweaking"
   ]
 }

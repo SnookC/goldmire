@@ -47,6 +47,9 @@ THE BOTS (all in bots.json)
     is open: before 10:30 AM New York time (9:30 Central) by yesterday's dollars
     traded, after that by today's dollars traded so far.
     The town shows just what it buys, not the 300.
+  * Crypto heroes with "scan" watch every coin Alpaca trades (about 35), most
+    traded first. Their daily techniques decide when to buy; two heroes never
+    hold the same coin.
   * Two bots never hold the same stock at the same time.
   * Positions you open by hand in Alpaca are left alone.
   * Stock and penny bots trade while the US market is open; crypto bots 24/7.

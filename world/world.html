@@ -540,7 +540,7 @@ footer { font-size: 12.5px; color: var(--muted); }
   }
   function watchHtml(b) {
     if (b.kind === "penny") return `<div class="watch"><span>Finds its own penny stocks</span></div>`;
-    if (b.scan) return `<div class="watch"><span>Scanning the ${b.scanning || b.scan} busiest stocks</span></div>`;
+    if (b.scan) return `<div class="watch"><span>${b.kind === "crypto" ? `Watching all ${b.scanning || ""} coins` : `Scanning the ${b.scanning || b.scan} busiest stocks`}</span></div>`;
     const wl = b.watchlist || [], added = new Set(b.added || []);
     return `<div class="watch">${wl.map(s => `<span class="${added.has(s) ? "new" : ""}" title="${esc((b.reasons || {})[s] || "")}">${esc(s)}</span>`).join("")}</div>`;
   }
@@ -590,7 +590,9 @@ footer { font-size: 12.5px; color: var(--muted); }
     const leadCard = b => {
       const h = b.hero || heroBlock(b), added = new Set(b.added || []);
       if (b.kind === "penny") return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>${esc(b.strategy_name || "")}</span></div><ul><li><b>Penny</b><span>Finds his own: today's busiest $1–$5 stocks, re-checked every 5 minutes. No researcher needed.</span></li></ul></div>`;
-      if (b.scan) return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>${esc(b.strategy_name || "")}</span></div><ul><li><b>Scan</b><span>Watches the ${b.scanning || b.scan} busiest stocks, rescanned every hour while the market is open, and buys only when her technique says so. Her buys show on her hero card.</span></li></ul></div>`;
+      if (b.scan) return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>${esc(b.strategy_name || "")}</span></div><ul><li><b>Scan</b><span>${b.kind === "crypto"
+        ? `Watches every coin Alpaca trades (${b.scanning || "all"}), and buys only when the ${esc(b.strategy_name || "")} technique says so. Buys show on the hero card.`
+        : `Watches the ${b.scanning || b.scan} busiest stocks, rescanned every hour while the market is open, and buys only when the technique says so. Buys show on the hero card.`}</span></li></ul></div>`;
       if (!b.researched) return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>picks by hand</span></div><ul>${(b.watchlist || []).map(s => `<li><b>${esc(s)}</b><span>set in bots.json</span></li>`).join("")}</ul></div>`;
       return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>${esc(b.strategy_name || "")}</span></div><ul>${(b.watchlist || []).map(s =>
         `<li class="${added.has(s) ? "new" : ""}"><b>${esc(s)}${added.has(s) ? " ✦" : ""}</b><span>${esc((b.reasons || {})[s] || "starting idea")}</span></li>`).join("")}</ul></div>`;
@@ -1791,7 +1793,7 @@ footer { font-size: 12.5px; color: var(--muted); }
         a.doing = `Marching out the gate to trade ${(b.positions || []).map(p => p.symbol).join(", ")}`; return go(a, a.camp.spot, () => idleAt(a, 6, "camp", { x: a.camp.x, y: a.camp.y + 10 }, campDoing(b))); }
       if (b.kind !== "crypto" && !state.marketOpen) return goInside(a, "Inside, asleep until the market opens", "Heading home to sleep");
       const r = rnd();
-      if (r < 0.3) { a.doing = "Off to read the guild board"; return go(a, SPOT.board, () => idleAt(a, rr(6, 12), "read", BOARD, `Reading new leads: ${b.scan ? "the busiest stocks" : (b.watchlist || []).slice(0, 3).join(", ") || "penny stocks"}`)); }
+      if (r < 0.3) { a.doing = "Off to read the guild board"; return go(a, SPOT.board, () => idleAt(a, rr(6, 12), "read", BOARD, `Reading new leads: ${b.scan ? (b.kind === "crypto" ? "every coin" : "the busiest stocks") : (b.watchlist || []).slice(0, 3).join(", ") || "penny stocks"}`)); }
       if (r < 0.5) { const s = SPOT.stalls[Math.floor(rnd() * 6)]; a.doing = "Strolling to the market"; return go(a, s.buyer, () => idleAt(a, rr(5, 10), "stand", s.face, "Buying supplies at the market")); }
       if (r < 0.68) { a.doing = "Off to the tavern"; return go(a, tavernSpot(), () => idleAt(a, rr(8, 14), "drink", tavFace(), "Telling tall tales at the tavern")); }
       if (r < 0.8) { a.doing = "Off to the guild hall"; return go(a, L.guild.spot, () => idleAt(a, rr(6, 12), "stand", { x: L.guild.door, y: 150 }, "Sparring in the guild hall yard")); }

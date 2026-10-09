@@ -1,6 +1,7 @@
 {
-  "version": "1.4.8",
+  "version": "1.4.9",
   "notes": [
-    "Profit by area at the top of the town, with a Today / All time switch: Stocks, Penny and Crypto each get their own total next to the grand total, so you can see which area needs tweaking (Today = sales today plus how holdings moved today)"
+    "Old Bram and Ysolde now watch every coin Alpaca trades (about 35) instead of a handful, so their once-a-day techniques get many more chances to find a real signal",
+    "Profit by area at the top of the town, with a Today / All time switch"
   ]
 }

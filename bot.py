@@ -155,6 +155,10 @@ SETTINGS_UPDATES = [
     ("2026-10-09-pip-back", "Pip back to work (trades sized by risk, so losses stay small)", {
         "Penny": {"benched": False},
     }),
+    ("2026-10-09-crypto-scan", "Old Bram and Ysolde watch every coin Alpaca trades", {
+        "Crypto-1": {"scan": 100},
+        "Crypto-2": {"scan": 100},
+    }),
 ]
 TRAINING = []      # what the latest settings update changed, for the town chronicle
 
@@ -223,8 +227,8 @@ def check_config(bots):
             problems.append(f"[{n}] max_positions must be 1 or more")
         if b.get("sizing", "split") not in ("split", "risk"):
             problems.append(f"[{n}] sizing must be \"split\" or \"risk\"")
-        if b.get("scan") and (b.get("kind") != "stock" or not isinstance(b["scan"], int) or not 10 <= b["scan"] <= 1000):
-            problems.append(f"[{n}] scan is for stock heroes: a number from 10 to 1000")
+        if b.get("scan") and (b.get("kind") not in ("stock", "crypto") or not isinstance(b["scan"], int) or not 10 <= b["scan"] <= 1000):
+            problems.append(f"[{n}] scan is for stock and crypto heroes: a number from 10 to 1000")
         if b.get("kind") in ("stock", "crypto") and not b["watchlist"] and not b.get("research", True):
             problems.append(f"[{n}] needs at least one symbol in its watchlist (or turn research on)")
         if b.get("kind") == "crypto" and any("/" not in s for s in b["watchlist"]):
@@ -331,7 +335,14 @@ for _k, _st in LEARNED.items():
     research.STYLES[_k] = _st.style
 TIMEFRAME_SECONDS = {"15Min": 900, "1Hour": 3600, "1Day": 86400}
 HISTORY_FOR = {"15Min": 20, "1Hour": 70, "1Day": 460}     # calendar days of bars to fetch (~300 bars)
-_DAILY_BARS = {}           # (kind, symbol) -> (New York date, finished daily bars), shared by every round that day
+_DAILY_BARS = {}           # (kind, symbol) -> (day, finished daily bars), shared by every round that day
+
+
+def _day_stamp(kind):
+    """The day a daily bar belongs to: crypto's day ends at midnight UTC, stocks' in New York."""
+    if kind == "crypto":
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return report.ny().strftime("%Y-%m-%d")
 
 
 # ---------------------------------------------------------------------------
@@ -370,7 +381,7 @@ class Round:
         symbols = [s for s in symbols if s]
         cache = self.__dict__.setdefault("_bars", {})
         if timeframe == "1Day":                   # finished daily bars only change once a day: keep them all day
-            stamp = report.ny().strftime("%Y-%m-%d")
+            stamp = _day_stamp(kind)
             for s in symbols:
                 kept = _DAILY_BARS.get((kind, s))
                 if kept and kept[0] == stamp:
@@ -392,7 +403,7 @@ class Round:
                                              "l": [float(r.low) for r in rows], "c": [float(r.close) for r in rows],
                                              "v": [float(r.volume or 0) for r in rows], "t": [r.timestamp for r in rows]}
                     if timeframe == "1Day":
-                        _DAILY_BARS[(kind, s)] = (report.ny().strftime("%Y-%m-%d"), cache[(s, timeframe)])
+                        _DAILY_BARS[(kind, s)] = (_day_stamp(kind), cache[(s, timeframe)])
         return {s: cache.get((s, timeframe), {"o": [], "h": [], "l": [], "c": [], "v": [], "t": []}) for s in symbols}
 
 
@@ -729,7 +740,7 @@ def build_status(positions, memory, market_open, bots):
             "researched": research.is_researched(b),
             "reasons": {} if research.scan_size(b) else rs.get("reasons", {}).get(b["name"], {}),
             "max_positions": b["max_positions"], "positions": pos_list, "holding": bool(pos_list),
-            "symbol": ", ".join(p["symbol"] for p in pos_list) or ("penny stocks" if b["kind"] == "penny" else f"the {len(wl)} busiest stocks" if research.scan_size(b) else ", ".join(wl[:3])),
+            "symbol": ", ".join(p["symbol"] for p in pos_list) or ("penny stocks" if b["kind"] == "penny" else (f"all {len(wl)} coins" if b["kind"] == "crypto" else f"the {len(wl)} busiest stocks") if research.scan_size(b) else ", ".join(wl[:3])),
             "realized_pl": realized, "unrealized_pl": unrealized, "pl": round(realized + unrealized, 2),
             "hero": game.hero_block(memory, b), "bank": bank.status(memory, b), "dollars": bank.trade_size(memory, b),
         })
@@ -1028,7 +1039,7 @@ def run_research(market, trading, stock_data, crypto_data, screener, news_client
         if not p:
             continue
         if p.get("scan"):                         # a 300-stock list: a summary, not every name
-            log.info(f"{who}: [{b['name']}] scanning the {len(p['watchlist'])} busiest stocks "
+            log.info(f"{who}: [{b['name']}] scanning {len(p['watchlist'])} {'coins' if b['kind'] == 'crypto' else 'busiest stocks'} "
                      f"({', '.join(p['watchlist'][:8])}...), {len(p['added'])} new today, {len(p['dropped'])} dropped")
             continue                              # the town only hears about what she actually buys
         log.info(f"{who}: [{b['name']}] watchlist -> {', '.join(p['watchlist']) or '(nothing fits today)'}")
@@ -1087,7 +1098,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
                 else "a smart stop" if (k, v) == ("stop_loss", "smart")
                 else f"juggling up to {v} trades at once" if k == "max_positions"
                 else "sizing each trade by its risk" if (k, v) == ("sizing", "risk")
-                else f"scanning the {v} busiest stocks" if k == "scan" else None)
+                else (("watching every coin Alpaca trades" if b.get("kind") == "crypto" else f"scanning the {v} busiest stocks") if k == "scan" else None))
         if (k, v) == ("benched", True):
             game.record_bench(memory, h)
             continue

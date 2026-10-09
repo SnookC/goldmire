@@ -270,8 +270,9 @@ def pick_watchlists(bots, studies, news_counts, held, previous, market=None, bus
         name, mk = b["name"], market_of(b)
         keep = list(dict.fromkeys(held.get(name, []) + b.get("pinned", [])))
         reasons = {s: ("holding it now" if s in held.get(name, []) else "pinned by you") for s in keep}
-        if scan_size(b) and mk == "stock" and busiest:
-            # a scanning hero watches the N busiest stocks and lets its own technique pick the moment
+        if scan_size(b) and busiest:
+            # a scanning hero watches the N busiest stocks (or every coin) and lets its own technique
+            # pick the moment. Scanning heroes may share a list; two heroes never hold the same symbol.
             picks = []
             for rank, sym in enumerate(busiest, 1):
                 if len(picks) >= max(0, scan_size(b) - len(keep)):
@@ -279,8 +280,7 @@ def pick_watchlists(bots, studies, news_counts, held, previous, market=None, bus
                 if sym in claimed or sym in keep or news_info(news_counts.get(sym))["tone"] <= AVOID_TONE:
                     continue
                 picks.append(sym)
-                reasons[sym] = f"#{rank} busiest stock (hourly scan)"
-                claimed.add(sym)
+                reasons[sym] = f"#{rank} busiest stock (hourly scan)" if mk == "stock" else f"#{rank} most-traded coin"
             new = keep + picks
             prev = previous.get(name, [])
             out[name] = {"watchlist": new, "reasons": {s: reasons[s] for s in new}, "scan": True,
@@ -429,7 +429,11 @@ def run(market, trading, stock_data, crypto_data, screener, news_client, bots, m
     studies = {market: study_market(market, data_client, leads, log)}
     held = {b["name"]: list(memory.get("held", {}).get(b["name"], {})) for b in bots}
     widest = max([scan_size(b) for b in mine] + [0])
-    busiest = busiest_stocks(trading, stock_data, memory, log, widest) if market == "stock" and widest else None
+    if market == "stock":
+        busiest = busiest_stocks(trading, stock_data, memory, log, widest) if widest else None
+    else:                                  # every coin Alpaca trades, most-traded first
+        sc = studies["crypto"]
+        busiest = sorted(sc, key=lambda k: sc[k].get("dollar_vol", 0), reverse=True) if widest else None
     picks = pick_watchlists(bots, studies, news, held, previous, market=market, busiest=busiest)
     for name, p in picks.items():
         rs["lists"][name] = p["watchlist"]

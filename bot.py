@@ -134,6 +134,8 @@ DEFAULT_BOTS = [
 
 # One-time changes to your heroes' settings, delivered with an update. Each is applied once,
 # after backing up bots.json (bots.json.before-<id>.bak), and only to heroes with these names.
+UNTESTED_STRATEGIES = {"ichimoku_hourly", "parabolic_sar_hourly"}   # given by order, not yet proven in the Proving Grounds
+
 SETTINGS_UPDATES = [
     ("2026-10-07-proving-grounds", "changes from the first Proving Grounds report", {
         "Stock-2": {"strategy": "bollinger_bounce"},                     # the strategy that passed
@@ -158,6 +160,9 @@ SETTINGS_UPDATES = [
     ("2026-10-09-crypto-scan", "Old Bram and Ysolde watch every coin Alpaca trades", {
         "Crypto-1": {"scan": 100},
         "Crypto-2": {"scan": 100},
+    }),
+    ("2026-10-09-ysolde-hourly", "Ysolde trades crypto through the day (hourly Ichimoku); Old Bram stays daily for comparison", {
+        "Crypto-2": {"strategy": "ichimoku_hourly"},
     }),
 ]
 TRAINING = []      # what the latest settings update changed, for the town chronicle
@@ -335,7 +340,16 @@ for _k, _st in LEARNED.items():
     research.STYLES[_k] = _st.style
 TIMEFRAME_SECONDS = {"15Min": 900, "1Hour": 3600, "1Day": 86400}
 HISTORY_FOR = {"15Min": 20, "1Hour": 70, "1Day": 460}     # calendar days of bars to fetch (~300 bars)
-_DAILY_BARS = {}           # (kind, symbol) -> (day, finished daily bars), shared by every round that day
+_DAILY_BARS = {}           # (kind, symbol, timeframe) -> (day or hour, finished bars), shared by every round in it
+
+
+def _bar_stamp(kind, timeframe):
+    """Which day (or hour) the latest finished bar belongs to; None = don't keep bars between rounds."""
+    if timeframe == "1Day":
+        return _day_stamp(kind)
+    if timeframe == "1Hour":
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H")
+    return None
 
 
 def _day_stamp(kind):
@@ -380,10 +394,10 @@ class Round:
         from alpaca.data.enums import DataFeed
         symbols = [s for s in symbols if s]
         cache = self.__dict__.setdefault("_bars", {})
-        if timeframe == "1Day":                   # finished daily bars only change once a day: keep them all day
-            stamp = _day_stamp(kind)
+        stamp = _bar_stamp(kind, timeframe)
+        if stamp:                                 # finished daily/hourly bars only change once a day/hour: reuse them
             for s in symbols:
-                kept = _DAILY_BARS.get((kind, s))
+                kept = _DAILY_BARS.get((kind, s, timeframe))
                 if kept and kept[0] == stamp:
                     cache.setdefault((s, timeframe), kept[1])
         need = [s for s in symbols if (s, timeframe) not in cache]
@@ -402,8 +416,8 @@ class Round:
                     cache[(s, timeframe)] = {"o": [float(r.open) for r in rows], "h": [float(r.high) for r in rows],
                                              "l": [float(r.low) for r in rows], "c": [float(r.close) for r in rows],
                                              "v": [float(r.volume or 0) for r in rows], "t": [r.timestamp for r in rows]}
-                    if timeframe == "1Day":
-                        _DAILY_BARS[(kind, s)] = (_day_stamp(kind), cache[(s, timeframe)])
+                    if stamp:
+                        _DAILY_BARS[(kind, s, timeframe)] = (stamp, cache[(s, timeframe)])
         return {s: cache.get((s, timeframe), {"o": [], "h": [], "l": [], "c": [], "v": [], "t": []}) for s in symbols}
 
 
@@ -1106,7 +1120,8 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
             game.record_unbench(memory, h)
             continue
         if what:
-            taught.setdefault((h, k in ("max_positions", "sizing", "scan")), []).append(what)
+            untested = k == "strategy" and v in UNTESTED_STRATEGIES
+            taught.setdefault((h, k in ("max_positions", "sizing", "scan") or untested), []).append(what)
     for (h, orders), whats in taught.items():
         joined = ", ".join(whats[:-1]) + (" and " if len(whats) > 1 else "") + whats[-1]
         (game.record_orders if orders else game.record_training)(memory, h, joined)

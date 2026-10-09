@@ -1,7 +1,8 @@
 {
-  "version": "1.5.0",
+  "version": "1.5.1",
   "notes": [
-    "Crypto trades through the day: Ysolde switches to an hourly Ichimoku cloud (5% stop) and can buy or sell any hour, day or night. Old Bram stays on his daily Parabolic SAR so you can compare the two",
+    "Suggest a lead: a small box above the Researchers' Board. Type a stock or coin, pick a hero (or Any hero), and they'll watch it, buying only when their technique says so",
+    "Crypto trades through the day: Ysolde switches to an hourly Ichimoku cloud and can buy or sell any hour. Old Bram stays daily so you can compare",
     "Two new techniques in the Proving Grounds: hourly Ichimoku and hourly Parabolic SAR for crypto"
   ]
 }

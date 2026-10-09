@@ -212,6 +212,14 @@ GOLDMIRE (the living town)
     and deeds.
   * Only this PC can see it, plus your own phone if you turn on phone access.
 
+SUGGEST A LEAD
+  Above the Researchers' Board: type a stock (NVDA) or a coin (BTC), pick a hero
+  or "Any hero", and click Suggest. Goldmire checks it with Alpaca first (no
+  typos, untradable symbols or leveraged funds). "Any hero" gives it to every
+  hero who trades that kind of thing; whoever's technique signals first buys.
+  A suggestion is something to watch, never an order to buy. It stays on the
+  list ("pinned" in bots.json) until you click its X. Pip finds his own.
+
 BENCHING A HERO
   Every hero card in the town has a Bench button. A benched hero makes no new
   trades; anything it holds is still sold by its normal rules. Click "Send

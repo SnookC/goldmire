@@ -93,6 +93,8 @@ LINES = {
                  "After long days in the Proving Grounds, {h} has learned {t}."],
     "orders": ["By order of the Guildmaster, {h} takes up {t}.",
                "New orders from the Guildmaster: {h} is {t}."],
+    "suggestion": ["The Guildmaster slips {h} a note: \"Keep an eye on {s}.\"",
+                   "{h} adds {s} to the watch, on the Guildmaster's word."],
     "bench_manual": ["By order of the Guildmaster, {h} takes a seat on the bench by the tavern door. No new quests until called back.",
                      "{h} hangs up their pack and sits out a while on the Guildmaster's orders."],
     "unbench": ["{h} gets up off the bench by the tavern door, stretches, and heads back out to work.",
@@ -343,6 +345,11 @@ def record_orders(memory, hero_name, what):
     """You changed how a hero works (more slots, sizing, a wider scan)."""
     ensure(memory)
     _say(memory, "orders", "info", h=hero_name, t=what)
+
+
+def record_suggestion(memory, hero_name, symbol):
+    ensure(memory)
+    _say(memory, "suggestion", "info", h=hero_name, s=symbol)
 
 
 def record_bench_manual(memory, hero_name):

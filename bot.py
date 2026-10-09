@@ -18,6 +18,7 @@ These are learning bots, not money-makers.
 import os
 import sys
 import json
+import re
 import time
 import logging
 import threading
@@ -74,6 +75,8 @@ RESTART = threading.Event()     # set after an update is installed: start Goldmi
 BOTS_LIVE = []                  # the running heroes (same dicts the main loop uses)
 BENCH_LOCK = threading.Lock()
 BENCH_EVENTS = []               # (hero, benched) from the town's bench buttons, for the chronicle
+TRADING_LIVE = []               # the Alpaca trading client, so the town's suggestion box can check symbols
+SUGGEST_EVENTS = []             # (hero, symbol, added) from the town's suggestion box
 UPDATE_EVERY_HOURS = 6
 LOCK_PORT = 8779                # held while Goldmire runs, so only one copy can trade at a time
 PID_FILE = os.path.join(HERE, "goldmire.pid")
@@ -751,6 +754,7 @@ def build_status(positions, memory, market_open, bots):
             "name": b["name"], "kind": b["kind"], "strategy": b["strategy"], "benched": bool(b.get("benched")),
             "strategy_name": STRATEGY_NAMES[b["strategy"]], "watchlist": [] if research.scan_size(b) else wl,
             "scan": research.scan_size(b), "scanning": len(wl) if research.scan_size(b) else 0,
+            "pinned": list(b.get("pinned", [])),
             "researched": research.is_researched(b),
             "reasons": {} if research.scan_size(b) else rs.get("reasons", {}).get(b["name"], {}),
             "max_positions": b["max_positions"], "positions": pos_list, "holding": bool(pos_list),
@@ -850,6 +854,128 @@ def set_bench(name, benched):
     return True, f"{hero} {'takes a seat on the bench' if benched else 'is back to work'}."
 
 
+def _patch_status(name, key, value):
+    """Change one field of one hero in the town's status file right away (before the next round)."""
+    try:
+        sp = os.path.join(WORLD_DIR, "status.json")
+        with open(sp, encoding="utf-8") as f:
+            st = json.load(f)
+        for b in st.get("bots", []):
+            if b.get("name") == name:
+                b[key] = value
+        with open(sp + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(st, f)
+        os.replace(sp + ".tmp", sp)
+    except (OSError, ValueError):
+        pass
+
+
+def _save_bot_field(name, key, value):
+    with open(BOTS_FILE, encoding="utf-8") as f:
+        data = json.load(f)
+    for b in data.get("bots", []):
+        if b.get("name") == name:
+            b[key] = value
+    tmp = BOTS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp, BOTS_FILE)
+
+
+def suggest_any(symbol, remove=False):
+    """'Any hero': give the suggestion to every hero who trades that kind of thing (stocks or crypto)."""
+    sym = (symbol or "").strip().upper().replace(" ", "")
+    if remove:
+        names = [b["name"] for b in BOTS_LIVE if sym in b.get("pinned", []) or sym + "/USD" in b.get("pinned", [])]
+        if not names:
+            return True, f"{sym} isn't on anyone's list."
+        for n in names:
+            suggest(n, sym, True)
+        return True, f"{sym} is off everyone's list."
+    market = "crypto" if "/" in sym else None
+    if market is None and TRADING_LIVE:
+        try:
+            a = TRADING_LIVE[0].get_asset(sym)
+            market = "crypto" if "CRYPTO" in str(getattr(a, "asset_class", "")).upper() else "stock"
+        except Exception:  # noqa: BLE001 - not a stock: maybe a coin
+            try:
+                TRADING_LIVE[0].get_asset(sym + "/USD")
+                market = "crypto"
+            except Exception:  # noqa: BLE001
+                return False, f"Alpaca doesn't know {sym}. Check the spelling."
+    market = market or "stock"
+    heroes = [b for b in BOTS_LIVE if b.get("kind") == market and not b.get("benched")] or [b for b in BOTS_LIVE if b.get("kind") == market]
+    if not heroes:
+        return False, f"No hero trades {market}."
+    done, last = [], ""
+    for b in heroes:
+        ok, msg = suggest(b["name"], sym)
+        last = msg
+        if ok:
+            done.append(game.hero_of(b)[0])
+    if not done:
+        return False, last
+    shown = sym if market == "stock" or "/" in sym else sym + "/USD"
+    return True, f"{' and '.join(done)} will look into {shown}. Whoever's technique signals first buys it."
+
+
+def suggest(name, symbol, remove=False):
+    """Add (or remove) a symbol you'd like a hero to look into. It joins the hero's watchlist and
+    stays there until you remove it; the hero still buys only when its technique says so."""
+    symbol = (symbol or "").strip().upper().replace(" ", "")
+    with BENCH_LOCK:
+        bot = next((b for b in BOTS_LIVE if b.get("name") == name), None)
+        if bot is None:
+            return False, "No hero by that name."
+        hero = game.hero_of(bot)[0]
+        kind = bot.get("kind")
+        if kind == "penny":
+            return False, f"{hero} finds his own penny stocks; suggest it to another hero."
+        if kind == "crypto" and symbol and "/" not in symbol and not remove and TRADING_LIVE:
+            try:                                   # a stock symbol typed for a crypto hero?
+                a = TRADING_LIVE[0].get_asset(symbol)
+                if "CRYPTO" not in str(getattr(a, "asset_class", "")).upper():
+                    return False, f"{hero} trades crypto, and {symbol} is a stock. Pick Gareth, Wren or Any hero."
+            except Exception:  # noqa: BLE001 - not a stock: carry on and treat it as a coin
+                pass
+        if kind == "crypto" and symbol and "/" not in symbol:
+            symbol = symbol.replace("USD", "") + "/USD" if symbol.endswith("USD") and len(symbol) > 3 else symbol + "/USD"
+        pins = list(bot.get("pinned", []))
+        if remove:
+            if symbol not in pins:
+                return True, f"{symbol} isn't on {hero}'s list."
+            pins.remove(symbol)
+        else:
+            if not re.fullmatch(r"[A-Z]{1,5}(\.[A-Z])?|[A-Z0-9]{2,10}/USD", symbol or ""):
+                return False, "That doesn't look like a stock (e.g. AAPL) or a coin (e.g. BTC)."
+            if (kind == "crypto") != ("/" in symbol):
+                return False, f"{hero} trades {'crypto' if kind == 'crypto' else 'stocks'}; that's not one."
+            if symbol in pins:
+                return True, f"{symbol} is already on {hero}'s list."
+            if len(pins) >= 12:
+                return False, f"{hero} already has 12 suggestions; remove one first."
+            if TRADING_LIVE:
+                try:
+                    a = TRADING_LIVE[0].get_asset(symbol)
+                except Exception:  # noqa: BLE001
+                    return False, f"Alpaca doesn't know {symbol}. Check the spelling."
+                if not getattr(a, "tradable", False) or str(getattr(getattr(a, "status", ""), "value", getattr(a, "status", ""))).lower() != "active":
+                    return False, f"{symbol} can't be traded on Alpaca right now."
+                if kind == "stock" and research.is_leveraged_name(getattr(a, "name", "")):
+                    return False, f"{symbol} is a leveraged or inverse fund; the guild doesn't trade those."
+            pins.append(symbol)
+        try:
+            _save_bot_field(name, "pinned", pins)
+        except (OSError, ValueError) as e:
+            return False, f"Couldn't save bots.json ({e})."
+        bot["pinned"] = pins
+        _patch_status(name, "pinned", pins)
+        SUGGEST_EVENTS.append((hero, symbol, not remove))
+    log.info(f"[{name}] {'suggestion added' if not remove else 'suggestion removed'} from the town: {symbol}")
+    return True, (f"{hero} will look into {symbol}. They buy only when their technique says so." if not remove
+                  else f"{symbol} is off {hero}'s list.")
+
+
 class _QuietHandler(SimpleHTTPRequestHandler):
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map,
                       ".html": "text/html; charset=utf-8", ".json": "application/json; charset=utf-8",
@@ -867,6 +993,19 @@ class _QuietHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        if self.path.split("?")[0] == "/api/suggest":
+            if self.headers.get("X-Goldmire") != "suggest":
+                self.send_error(403)
+                return
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                req = json.loads(self.rfile.read(min(n, 2000)) or b"{}")
+                who = str(req.get("bot", ""))
+                ok, msg = (suggest_any if who == "any" else lambda sym, rm: suggest(who, sym, rm))(str(req.get("symbol", "")), bool(req.get("remove")))
+            except (ValueError, TypeError):
+                ok, msg = False, "Bad request."
+            self._json(200 if ok else 400, {"ok": ok, "message": msg})
+            return
         if self.path.split("?")[0] == "/api/bench":
             if self.headers.get("X-Goldmire") != "bench":
                 self.send_error(403)
@@ -1099,6 +1238,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     BOTS_LIVE[:] = bots
     key, secret = load_keys()
     trading = TradingClient(key, secret, paper=True)   # paper=True is hard-coded on purpose
+    TRADING_LIVE[:] = [trading]
     stock_data = StockHistoricalDataClient(key, secret)
     crypto_data = CryptoHistoricalDataClient(key, secret)
     screener = ScreenerClient(key, secret)
@@ -1146,7 +1286,21 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
             events, BENCH_EVENTS[:] = list(BENCH_EVENTS), []
         for hero, benched in events:
             (game.record_bench_manual if benched else game.record_unbench)(memory, hero)
-        if events:
+        with BENCH_LOCK:
+            tips, SUGGEST_EVENTS[:] = list(SUGGEST_EVENTS), []
+        for hero, sym, added in tips:
+            b = next((x for x in bots if game.hero_of(x)[0] == hero), None)
+            lists = memory.setdefault("research", {}).setdefault("lists", {})
+            reasons = memory["research"].setdefault("reasons", {})
+            if b is not None and added:
+                lst = lists.setdefault(b["name"], list(b.get("watchlist", [])))
+                if sym not in lst:
+                    lst.insert(0, sym)
+                reasons.setdefault(b["name"], {})[sym] = "suggested by you"
+                game.record_suggestion(memory, hero, sym)
+            elif b is not None and sym in lists.get(b["name"], []) and sym not in held_by(memory, b):
+                lists[b["name"]].remove(sym)
+        if events or tips:
             save_memory(memory)
         try:
             market_open = trading.get_clock().is_open

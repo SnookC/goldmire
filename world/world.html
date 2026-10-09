@@ -127,6 +127,18 @@ section { display: grid; gap: 10px; align-content: start; }
 .card.benched { opacity: .82; }
 
 .boards { display: grid; gap: 12px; }
+.suggest { margin-bottom: 12px; }
+.suggest .srow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.suggest .srow .note { flex: 1 1 220px; }
+.suggest input, .suggest select { font: inherit; color: inherit; background: #12180f; border: 1px solid #3a4532; border-radius: 8px; padding: 7px 10px; min-height: 40px; }
+.suggest input { flex: 1 1 140px; min-width: 0; text-transform: uppercase; }
+.suggest select { flex: 0 1 200px; }
+.suggest .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.suggest .pins { display: flex; flex-wrap: wrap; gap: 6px; }
+.suggest .pins span { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #3a4532; border-radius: 999px; background: #12180f; padding: 3px 4px 3px 10px; font-size: 13px; }
+.suggest .pins b { font-weight: 700; }
+.suggest .pins button { padding: 0 8px; min-height: 26px; font-size: 13px; border-radius: 999px; }
+.suggest.off input, .suggest.off select, .suggest.off button { opacity: .5; }
 .ledger .lnav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ledger .lnav b { font-family: Almendra, Georgia, serif; font-size: 18px; color: var(--gilt-hi); text-align: center; }
 .ledger .lnav button { padding: 6px 12px; min-width: 44px; }
@@ -285,6 +297,16 @@ footer { font-size: 12.5px; color: var(--muted); }
 
   <section>
     <h2>The Researchers' Board</h2>
+    <form class="panel suggest" id="suggest" autocomplete="off">
+      <div class="srow"><b>Suggest a lead</b><span class="note">A hero watches it and buys only when their technique says so.</span></div>
+      <div class="srow">
+        <label class="sr" for="sgSym">Stock or coin</label><input id="sgSym" maxlength="12" placeholder="e.g. NVDA or BTC" autocapitalize="characters" spellcheck="false">
+        <label class="sr" for="sgHero">Hero</label><select id="sgHero"></select>
+        <button type="submit" id="sgGo">Suggest</button>
+      </div>
+      <div class="note" id="sgMsg" aria-live="polite"></div>
+      <div class="pins" id="sgPins"></div>
+    </form>
     <div class="boards" id="boards"></div>
     <div class="panel newsboard" id="newsboard" aria-live="polite"></div>
   </section>
@@ -597,6 +619,7 @@ footer { font-size: 12.5px; color: var(--muted); }
       return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>${esc(b.strategy_name || "")}</span></div><ul>${(b.watchlist || []).map(s =>
         `<li class="${added.has(s) ? "new" : ""}"><b>${esc(s)}${added.has(s) ? " ✦" : ""}</b><span>${esc((b.reasons || {})[s] || "starting idea")}</span></li>`).join("")}</ul></div>`;
     };
+    renderSuggest();
     $("boards").innerHTML = ["stock", "crypto"].map(m => {
       const r = researchOf(m), crypto = m === "crypto", every = r?.every_minutes || (crypto ? 15 : 30);
       const heroes = state.bots.filter(b => (marketOf(b) || "stock") === m);
@@ -636,6 +659,45 @@ footer { font-size: 12.5px; color: var(--muted); }
     $("demo").hidden = state.live;
     diffToasts(g);
   }
+  // ---- the suggestion box: give a hero (or any hero) a stock or coin to look into ----
+  function renderSuggest() {
+    const form = $("suggest"); if (!form) return;
+    const heroes = state.bots.filter(b => b.kind === "stock" || b.kind === "crypto");
+    const sel = $("sgHero"), keep = sel.value || "any";
+    sel.innerHTML = `<option value="any">Any hero</option>` + heroes.map(b => `<option value="${esc(b.name)}">${esc((b.hero && b.hero.hero) || b.name)} (${b.kind === "crypto" ? "crypto" : "stocks"})</option>`).join("");
+    sel.value = [...sel.options].some(o => o.value === keep) ? keep : "any";
+    form.classList.toggle("off", !state.live);
+    $("sgGo").disabled = !state.live;
+    const offMsg = "Works when Goldmire is running on your PC.";
+    if (!state.live && !$("sgMsg").textContent) $("sgMsg").textContent = offMsg;
+    if (state.live && $("sgMsg").textContent === offMsg) $("sgMsg").textContent = "";
+    const short = n => n.startsWith("Old ") ? n.split(" ").slice(0, 2).join(" ") : n.split(" ")[0];
+    const pins = heroes.flatMap(b => (b.pinned || []).map(sym => ({ sym, b })));
+    $("sgPins").innerHTML = pins.length ? pins.map(({ sym, b }) => `<span><b>${esc(sym)}</b> ${esc(short((b.hero && b.hero.hero) || b.name))}
+      <button type="button" data-unpin="${esc(sym)}" data-bot="${esc(b.name)}" aria-label="Remove ${esc(sym)} from ${esc(b.name)}">✕</button></span>`).join("") : "";
+  }
+  async function sendSuggest(body) {
+    try {
+      const r = await fetch("/api/suggest", { method: "POST", headers: { "Content-Type": "application/json", "X-Goldmire": "suggest" }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      $("sgMsg").textContent = j.message || (r.ok ? "Done." : "Couldn't do that.");
+      if (r.ok && j.ok) poll && poll();
+      return r.ok && j.ok;
+    } catch (_) { $("sgMsg").textContent = "Couldn't reach Goldmire. Is the PC on and Goldmire running?"; return false; }
+  }
+  $("suggest").addEventListener("submit", async e => {
+    e.preventDefault();
+    const sym = $("sgSym").value.trim().toUpperCase();
+    if (!sym) { $("sgMsg").textContent = "Type a stock (like NVDA) or a coin (like BTC) first."; return; }
+    $("sgGo").disabled = true; $("sgMsg").textContent = "Checking with Alpaca…";
+    if (await sendSuggest({ bot: $("sgHero").value, symbol: sym })) $("sgSym").value = "";
+    $("sgGo").disabled = !state.live;
+  });
+  $("sgPins").addEventListener("click", async e => {
+    const x = e.target.closest("[data-unpin]"); if (!x) return;
+    x.disabled = true;
+    await sendSuggest({ bot: x.dataset.bot, symbol: x.dataset.unpin, remove: true });
+  });
   $("heroes").addEventListener("click", async e => {
     const bb = e.target.closest("[data-bench]");
     if (!bb) return;

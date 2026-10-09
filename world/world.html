@@ -561,7 +561,7 @@ footer { font-size: 12.5px; color: var(--muted); }
     const leadCard = b => {
       const h = b.hero || heroBlock(b), added = new Set(b.added || []);
       if (b.kind === "penny") return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>${esc(b.strategy_name || "")}</span></div><ul><li><b>Penny</b><span>Finds his own: today's busiest $1–$5 stocks, re-checked every 5 minutes. No researcher needed.</span></li></ul></div>`;
-      if (b.scan) return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>${esc(b.strategy_name || "")}</span></div><ul><li><b>Scan</b><span>Watches the ${b.scanning || b.scan} busiest stocks, rescanned twice a day (at the opening bell and at midday), and buys only when her technique says so. Her buys show on her hero card.</span></li></ul></div>`;
+      if (b.scan) return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>${esc(b.strategy_name || "")}</span></div><ul><li><b>Scan</b><span>Watches the ${b.scanning || b.scan} busiest stocks, rescanned every hour while the market is open, and buys only when her technique says so. Her buys show on her hero card.</span></li></ul></div>`;
       if (!b.researched) return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>picks by hand</span></div><ul>${(b.watchlist || []).map(s => `<li><b>${esc(s)}</b><span>set in bots.json</span></li>`).join("")}</ul></div>`;
       return `<div class="lead"><div class="h"><span>${esc(h.hero)}</span><span>${esc(b.strategy_name || "")}</span></div><ul>${(b.watchlist || []).map(s =>
         `<li class="${added.has(s) ? "new" : ""}"><b>${esc(s)}${added.has(s) ? " ✦" : ""}</b><span>${esc((b.reasons || {})[s] || "starting idea")}</span></li>`).join("")}</ul></div>`;

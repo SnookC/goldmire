@@ -149,6 +149,9 @@ SETTINGS_UPDATES = [
         "Crypto-1": {"max_positions": 10, "sizing": "risk"},
         "Crypto-2": {"max_positions": 10, "sizing": "risk"},
     }),
+    ("2026-10-09-pip-back", "Pip back to work (trades sized by risk, so losses stay small)", {
+        "Penny": {"benched": False},
+    }),
 ]
 TRAINING = []      # what the latest settings update changed, for the town chronicle
 
@@ -1030,6 +1033,9 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
                 else f"scanning the {v} busiest stocks" if k == "scan" else None)
         if (k, v) == ("benched", True):
             game.record_bench(memory, h)
+            continue
+        if k == "benched" and not v:
+            game.record_unbench(memory, h)
             continue
         if what:
             taught.setdefault((h, k in ("max_positions", "sizing", "scan")), []).append(what)

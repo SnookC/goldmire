@@ -31,6 +31,7 @@ from dotenv import load_dotenv
 import game
 import bank
 import research
+import guards
 import updater
 import news
 import exits
@@ -372,7 +373,13 @@ class Round:
         self.trading, self.stock_data, self.crypto_data, self.screener = trading, stock_data, crypto_data, screener
         self.market_open = market_open
         self.positions = {norm(p.symbol): p for p in trading.get_all_positions()}
-        self.open_orders = {norm(o.symbol) for o in trading.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN))}
+        orders = list(trading.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN)))
+        # buys still waiting to fill (a symbol here isn't "gone" yet) - protective stops don't count
+        self.open_orders = {norm(o.symbol) for o in orders if not guards.is_sell(o)}
+        self.guard_orders = {}                    # open protective stop orders, by symbol
+        for o in orders:
+            if guards.is_sell(o) and guards.is_stop(o):
+                self.guard_orders.setdefault(norm(o.symbol), []).append(o)
 
     def closes(self, symbols, kind):
         """Price history for several symbols in one request: {symbol: [closes]}."""
@@ -514,10 +521,21 @@ def place_sell(trading, bot, memory, symbol, position=None, reason=""):
         locked_in = float(position.unrealized_pl)
     except Exception:
         locked_in = 0.0
-    trading.close_position(norm(symbol))
+    if guards.cancel_for(trading, symbol, log.info):      # its protective stop holds the shares: free them first
+        time.sleep(1.0)
+    try:
+        trading.close_position(norm(symbol))
+    except Exception:  # noqa: BLE001 - the cancel can take a moment to land; try once more
+        time.sleep(2.0)
+        trading.close_position(norm(symbol))
     h = held_by(memory, bot).pop(symbol, None) or {}
+    _book_sale(bot, memory, symbol, locked_in, reason, h, getattr(position, "avg_entry_price", None), getattr(position, "current_price", None))
+
+
+def _book_sale(bot, memory, symbol, locked_in, reason, h, paid, price):
+    """Record a finished trade everywhere: journal, chronicle, purse, log."""
     report.note(memory, side="sell", bot=bot["name"], symbol=symbol, pl=round(locked_in, 2), reason=reason, cost=h.get("cost"),
-                paid=getattr(position, "avg_entry_price", None), price=getattr(position, "current_price", None))
+                paid=paid, price=price)
     memory["realized"][bot["name"]] = memory["realized"].get(bot["name"], 0.0) + locked_in
     memory["trades"] = memory.get("trades", 0) + 1
     game.record_sell(memory, bot, symbol, locked_in, reason)
@@ -586,6 +604,21 @@ def run_bot(bot, rnd, memory):
     # 1) Tidy up: forget buys that never filled (or positions you closed by hand)
     for sym in list(held):
         if norm(sym) not in rnd.positions and norm(sym) not in rnd.open_orders:
+            fill = guards.filled(rnd.trading, held[sym])
+            if fill:                                   # its protective stop sold it at Alpaca
+                qty, px = fill
+                h = held.pop(sym)
+                entry = float(h.get("entry") or 0) or (h.get("cost", 0) / qty if qty else 0)
+                pl = round(qty * (px - entry), 2) if entry else 0.0
+                move = (px / entry - 1) if entry else 0.0
+                why = (f"(let it build: trailing stop held by Alpaca, trade at {move:+.1%})" if h.get("guard_trailing")
+                       else f"(stop-loss at {move:+.1%}, held by Alpaca)")
+                _book_sale(bot, memory, sym, pl, why, h, entry or None, px)
+                if "stop-loss" in why:                 # no buying it straight back
+                    until = datetime.now(timezone.utc) + timedelta(hours=exits.COOLDOWN_HOURS)
+                    memory.setdefault("cooldown", {}).setdefault(name, {})[sym] = until.isoformat(timespec="seconds")
+                save_memory(memory)
+                continue
             log.info(f"[{name}] {sym}: no longer held (order didn't fill or was closed by hand)")
             report.note(memory, side="gone", bot=name, symbol=sym, note="the buy didn't fill, or it was closed outside Goldmire")
             held.pop(sym)
@@ -631,6 +664,13 @@ def run_bot(bot, rnd, memory):
             reason = f"(take-profit at {change:+.1%})"
         elif signal == "sell" and not building:
             reason = f"({STRATEGY_NAMES[bot['strategy']]} says sell)"
+        if not reason and bot.get("guards", True):
+            h["entry"] = entry or h.get("entry")
+            h["guard_trailing"] = bool(building)
+            gp = guards.wanted_price(h, entry, stop, building, trail)
+            if gp and price and gp < price:          # (a guard above the price would sell at once)
+                guards.keep(rnd, h, sym, norm(sym), pos, gp, kind == "crypto", log.info, f"[{name}]")
+                save_memory(memory)
         if reason:
             place_sell(rnd.trading, bot, memory, sym, pos, reason)
             if "stop-loss" in reason or "bad news" in reason:      # no buying it straight back

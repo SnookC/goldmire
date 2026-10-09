@@ -1,8 +1,6 @@
 {
-  "version": "1.5.1",
+  "version": "1.5.2",
   "notes": [
-    "Suggest a lead: a small box above the Researchers' Board. Type a stock or coin, pick a hero (or Any hero), and they'll watch it, buying only when their technique says so",
-    "Crypto trades through the day: Ysolde switches to an hourly Ichimoku cloud and can buy or sell any hour. Old Bram stays daily so you can compare",
-    "Two new techniques in the Proving Grounds: hourly Ichimoku and hourly Parabolic SAR for crypto"
+    "Protective stops held by Alpaca: every holding with a stop-loss now has a real stop order at Alpaca, so a fast drop is sold at once instead of slipping past the stop between Goldmire's 5-minute checks. Trailing stops move the order up as a trade climbs"
   ]
 }

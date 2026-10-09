@@ -131,6 +131,16 @@ HOW HEROES SELL: STOPS, "LET WINNERS BUILD" AND COOL-DOWNS  -- exits.py
   The Proving Grounds tests every style with no stop, 3%, 5%, 8%, smart, and
   "let winners build", and marks the best for stocks and for crypto.
 
+PROTECTIVE STOPS HELD BY ALPACA  -- guards.py
+  Goldmire checks prices every 5 minutes, so a fast drop could slip past a
+  stop-loss between checks. Now every holding with a stop also gets a real stop
+  order at Alpaca (a "guard"): if the price falls through it, Alpaca sells at
+  once. Stocks get a day order, placed again each morning; crypto gets a
+  good-till-cancelled stop-limit. With "let winners build" the guard climbs
+  with the trailing stop (never down). Before any other sale Goldmire cancels
+  the guard first. A guard sale shows in the ledger like any other sale.
+  Turn guards off for a hero with "guards": false in bots.json.
+
 THE PROVING GROUNDS: TEST A STRATEGY BEFORE A HERO USES IT  -- backtest.py
   Start menu > Goldmire - Test strategies (or 6_test_strategies.bat).
   Replays years of real prices for 12 stocks and 8 coins and trades every

@@ -1,6 +1,6 @@
 {
-  "version": "1.4.7",
+  "version": "1.4.8",
   "notes": [
-    "Profit by area at the top of the town: Stocks, Penny and Crypto each get their own total (closed and open trades), next to the grand total, so you can see which area needs tweaking"
+    "Profit by area at the top of the town, with a Today / All time switch: Stocks, Penny and Crypto each get their own total next to the grand total, so you can see which area needs tweaking (Today = sales today plus how holdings moved today)"
   ]
 }

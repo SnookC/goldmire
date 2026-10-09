@@ -116,6 +116,10 @@ section { display: grid; gap: 10px; align-content: start; }
 .card .state { font-size: 12.5px; color: var(--muted); }
 .card .state b { color: var(--gilt-hi); font-weight: 700; }
 .card .find { justify-self: start; font-size: 12.5px; padding: 4px 10px; }
+.card .acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.card .bench { font-size: 12.5px; padding: 4px 10px; }
+.card .bench.on { border-color: var(--gilt); color: var(--gilt-hi); }
+.card.benched { opacity: .82; }
 
 .boards { display: grid; gap: 12px; }
 .ledger .lnav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -548,14 +552,15 @@ footer { font-size: 12.5px; color: var(--muted); }
     $("heroes").innerHTML = state.bots.map((b, i) => {
       const h = b.hero || heroBlock(b), lo2 = h.level > 1 ? needFor(h.level - 1) : 0, hi2 = needFor(h.level);
       const streak = h.streak >= 2 ? ` · ${h.streak}-win streak` : h.streak <= -2 ? ` · ${-h.streak}-loss slump` : "";
-      return `<article class="card${b.positions?.length ? " quest" : ""}"><span class="lv">Lv ${h.level}</span>
+      return `<article class="card${b.positions?.length ? " quest" : ""}${b.benched ? " benched" : ""}"><span class="lv">Lv ${h.level}</span>
         <div class="top"><div class="emblem"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.cls] || ICONS.Knight}</svg></div>
           <div class="who"><div class="n">${esc(h.hero)}</div><div class="c">${esc(h.title)} ${esc(h.cls)} · ${esc(b.strategy_name || "")}</div></div></div>
         <div class="bar" title="${h.xp} XP"><i style="width:${clamp((h.xp - lo2) / (hi2 - lo2) * 100, 0, 100)}%"></i></div>
         <div class="stats"><span class="gold num ${cls(b.pl)}">${sgold(b.pl)}</span><span class="rec num">W${h.wins} · L${h.losses}${streak}</span></div>
         ${holdsHtml(b)}${purseHtml(b.bank)}
         <div class="state">${stateLine(b)}</div>
-        <button class="find" type="button" data-hero="${i}">Find in town</button></article>`;
+        <div class="acts"><button class="find" type="button" data-hero="${i}">Find in town</button>${state.live ? `<button class="bench${b.benched ? " on" : ""}" type="button" data-bench="${i}"
+          title="${b.benched ? "Let this hero start new trades again" : "Stop new buys for this hero. What they hold is still sold by their normal rules."}">${b.benched ? "Send back to work" : "Bench"}</button>` : ""}</div></article>`;
     }).join("");
     // researchers' board: one panel per researcher, with the heroes they serve
     const leadCard = b => {
@@ -605,6 +610,22 @@ footer { font-size: 12.5px; color: var(--muted); }
     $("demo").hidden = state.live;
     diffToasts(g);
   }
+  $("heroes").addEventListener("click", async e => {
+    const bb = e.target.closest("[data-bench]");
+    if (!bb) return;
+    const b = state.bots[+bb.dataset.bench]; if (!b) return;
+    const name = (b.hero && b.hero.hero) || b.name, bench = !b.benched;
+    const ask = bench ? `Bench ${name}?\n\nNo new trades until you send them back to work. Anything they hold now is still sold by their normal rules.`
+                      : `Send ${name} back to work?\n\nThey'll start looking for new trades again on the next round (within 5 minutes).`;
+    if (!window.confirm(ask)) return;
+    bb.disabled = true;
+    try {
+      const r = await fetch("/api/bench", { method: "POST", headers: { "Content-Type": "application/json", "X-Goldmire": "bench" }, body: JSON.stringify({ bot: b.name, benched: bench }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) { b.benched = bench; render(); toast(bench ? "Benched" : "Back to work", j.message || name); }
+      else { toast("Couldn't do that", j.message || "Is Goldmire running?", true); bb.disabled = false; }
+    } catch (_) { toast("Couldn't reach Goldmire", "Is the PC on and Goldmire running?", true); bb.disabled = false; }
+  });
   $("heroes").addEventListener("click", e => { const btn = e.target.closest("[data-hero]"); if (btn) { town.findHero(+btn.dataset.hero); $("town").scrollIntoView({ behavior: "smooth", block: "center" }); } });
 
   // =====================================================================

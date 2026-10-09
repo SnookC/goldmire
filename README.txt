@@ -209,6 +209,12 @@ GOLDMIRE (the living town)
     and deeds.
   * Only this PC can see it, plus your own phone if you turn on phone access.
 
+BENCHING A HERO
+  Every hero card in the town has a Bench button. A benched hero makes no new
+  trades; anything it holds is still sold by its normal rules. Click "Send
+  back to work" to undo. It takes effect at once, is saved in bots.json
+  ("benched": true), and the chronicle notes it. Works from your phone too.
+
 THE DAY'S LEDGER: YOUR END-OF-DAY REPORT  -- report.py
   In the town, under the heroes: "Today so far", updated every 5 minutes, and
   a report saved for every day at 4:05 PM New York time (3:05 PM Central).

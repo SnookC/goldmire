@@ -71,6 +71,9 @@ log = logging.getLogger("bot")
 
 STOP = threading.Event()        # set by the tray icon's "Stop Goldmire"
 RESTART = threading.Event()     # set after an update is installed: start Goldmire again
+BOTS_LIVE = []                  # the running heroes (same dicts the main loop uses)
+BENCH_LOCK = threading.Lock()
+BENCH_EVENTS = []               # (hero, benched) from the town's bench buttons, for the chronicle
 UPDATE_EVERY_HOURS = 6
 LOCK_PORT = 8779                # held while Goldmire runs, so only one copy can trade at a time
 PID_FILE = os.path.join(HERE, "goldmire.pid")
@@ -781,6 +784,47 @@ def update_world(trading, memory, market_open, bots):
     log.info(f"World: total bot profit/loss ${status['total_pl']:+.2f}")
 
 
+def set_bench(name, benched):
+    """Bench a hero (no new buys; what they hold is still sold by their rules) or send them back
+    to work. Takes effect at once, is saved in bots.json, and the town's status file is updated."""
+    benched = bool(benched)
+    with BENCH_LOCK:
+        bot = next((b for b in BOTS_LIVE if b.get("name") == name), None)
+        if bot is None:
+            return False, "No hero by that name."
+        hero = game.hero_of(bot)[0]
+        if bool(bot.get("benched")) == benched:
+            return True, f"{hero} is already {'on the bench' if benched else 'at work'}."
+        try:
+            with open(BOTS_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+            for b in data.get("bots", []):
+                if b.get("name") == name:
+                    b["benched"] = benched
+            tmp = BOTS_FILE + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp, BOTS_FILE)
+        except (OSError, ValueError) as e:
+            return False, f"Couldn't save bots.json ({e})."
+        bot["benched"] = benched
+        BENCH_EVENTS.append((hero, benched))
+        try:                                   # show it in the town right away, before the next round
+            sp = os.path.join(WORLD_DIR, "status.json")
+            with open(sp, encoding="utf-8") as f:
+                st = json.load(f)
+            for b in st.get("bots", []):
+                if b.get("name") == name:
+                    b["benched"] = benched
+            with open(sp + ".tmp", "w", encoding="utf-8") as f:
+                json.dump(st, f)
+            os.replace(sp + ".tmp", sp)
+        except (OSError, ValueError):
+            pass
+    log.info(f"[{name}] {'benched from the town (no new buys; holdings sold by its rules)' if benched else 'sent back to work from the town'}")
+    return True, f"{hero} {'takes a seat on the bench' if benched else 'is back to work'}."
+
+
 class _QuietHandler(SimpleHTTPRequestHandler):
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map,
                       ".html": "text/html; charset=utf-8", ".json": "application/json; charset=utf-8",
@@ -798,6 +842,18 @@ class _QuietHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        if self.path.split("?")[0] == "/api/bench":
+            if self.headers.get("X-Goldmire") != "bench":
+                self.send_error(403)
+                return
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                req = json.loads(self.rfile.read(min(n, 2000)) or b"{}")
+                ok, msg = set_bench(str(req.get("bot", "")), req.get("benched"))
+            except (ValueError, TypeError):
+                ok, msg = False, "Bad request."
+            self._json(200 if ok else 400, {"ok": ok, "message": msg})
+            return
         if self.path.split("?")[0] != "/api/update":
             self.send_error(404)
             return
@@ -1015,6 +1071,7 @@ def main():
 def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, ScreenerClient, NewsClient):
     bots = load_bots()
     check_config(bots)
+    BOTS_LIVE[:] = bots
     key, secret = load_keys()
     trading = TradingClient(key, secret, paper=True)   # paper=True is hard-coded on purpose
     stock_data = StockHistoricalDataClient(key, secret)
@@ -1059,6 +1116,12 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     once = "--once" in sys.argv
     start_world_server(open_browser=not once and "--no-browser" not in sys.argv)   # --no-browser: started at sign-in
     while not STOP.is_set():
+        with BENCH_LOCK:
+            events, BENCH_EVENTS[:] = list(BENCH_EVENTS), []
+        for hero, benched in events:
+            (game.record_bench_manual if benched else game.record_unbench)(memory, hero)
+        if events:
+            save_memory(memory)
         try:
             market_open = trading.get_clock().is_open
             rnd = Round(trading, stock_data, crypto_data, screener, market_open)

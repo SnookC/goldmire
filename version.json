@@ -1,7 +1,6 @@
 {
-  "version": "1.4.5",
+  "version": "1.4.6",
   "notes": [
-    "Pip is back to work: he hunts penny-stock breakouts again, with each trade sized by risk (about 75 cents of his purse at stake), up to 10 at once",
-    "Wren's 300 busiest stocks are rescanned every hour while the market is open, instead of twice a day"
+    "A Bench button on every hero card: bench any hero at any time (no new trades; what they hold is still sold by their normal rules), and send them back to work with one click"
   ]
 }

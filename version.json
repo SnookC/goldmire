@@ -1,6 +1,6 @@
 {
-  "version": "1.5.2",
+  "version": "1.5.3",
   "notes": [
-    "Protective stops held by Alpaca: every holding with a stop-loss now has a real stop order at Alpaca, so a fast drop is sold at once instead of slipping past the stop between Goldmire's 5-minute checks. Trailing stops move the order up as a trade climbs"
+    "The Hero Trials (8_hero_trials.bat): replays each hero exactly as it trades today on real price history and compares it with buying and holding SPY or Bitcoin, using Alpaca's backtesting rules, 4 stretches of time and a double-cost stress test. Read-only: no trading changes"
   ]
 }

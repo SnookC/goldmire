@@ -162,6 +162,27 @@ THE PROVING GROUNDS: TEST A STRATEGY BEFORE A HERO USES IT  -- backtest.py
   believe traders who buy at random times (same number of trades, held as
   long). To pass, it must beat 95% of them.
 
+THE HERO TRIALS: IS EACH HERO EARNING ITS KEEP?  -- hero_test.py
+  Double-click 8_hero_trials.bat.
+  The Proving Grounds tests a STRATEGY. The Hero Trials tests a HERO, exactly
+  as it trades today: its own strategy, stop, "let winners build", slots,
+  trade sizing and one $100 pot, on a wide list of busy stocks (or coins),
+  and compares it with simply buying and holding SPY (or Bitcoin).
+  It follows Alpaca's own backtesting rules (github.com/alpacahq/alpaca-skills):
+  orders fill at the next bar's open (no peeking), costs on every buy and
+  sell, and the "Teaching Five" for every hero:
+    1. total return vs buy-and-hold   2. worst drop   3. trades
+    4. win rate                       5. Sharpe (return per unit of bumpiness)
+  Two extra checks against luck: history is cut into 4 stretches (a good hero
+  makes money in most of them), and a stress test doubles trading costs (a
+  hero that only wins when trading is cheap is fragile).
+  Verdicts: EARNING, SO-SO, LOSING, TOO FEW (trades to judge).
+  Report: proving_grounds/heroes.html. Every simulated trade and the day-by-
+  day balance are in proving_grounds/heroes/<hero>/trades.csv and equity.csv.
+  It can't see bad-news exits or heroes sharing symbols, and today's busy
+  names leave out companies that crashed (that flatters results, most of all
+  for pennies). Nothing here places trades.
+
 SETTINGS UPDATES
   Sometimes an update also changes your heroes' settings (for example after a
   Proving Grounds report). Each change is applied once, logged in bot_log.txt and

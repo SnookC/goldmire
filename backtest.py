@@ -204,13 +204,13 @@ def _keys():
     return key, secret
 
 
-def _cache_path(market, tf):
-    return os.path.join(DATA_DIR, f"{market}_{tf}.json")
+def _cache_path(market, tf, tag=""):
+    return os.path.join(DATA_DIR, f"{market}{tag}_{tf}.json")
 
 
-def fetch_history(market, tf, log=print):
+def fetch_history(market, tf, log=print, symbols=None, tag=""):
     """{symbol: {"t": [...], "o": [...], "h": [...], "l": [...], "c": [...], "v": [...]}}"""
-    path = _cache_path(market, tf)
+    path = _cache_path(market, tf, tag)
     if os.path.exists(path) and time.time() - os.path.getmtime(path) < DATA_MAX_AGE_HOURS * 3600:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
@@ -222,7 +222,7 @@ def fetch_history(market, tf, log=print):
     start = datetime.now(timezone.utc) - timedelta(days=HISTORY_DAYS[tf])
     end = datetime.now(timezone.utc) - timedelta(minutes=20)     # free data plans can't see the last 15 minutes
     key, secret = _keys()
-    syms = penny_basket(key, secret, log) if market == "penny" else BASKET[market]
+    syms = list(symbols) if symbols else penny_basket(key, secret, log) if market == "penny" else BASKET[market]
     log(f"Downloading {HISTORY_DAYS[tf]} days of {tf} {market} prices for {len(syms)} symbols...")
     if market in ("stock", "penny"):
         bars = StockHistoricalDataClient(key, secret).get_stock_bars(
@@ -248,11 +248,13 @@ def fetch_history(market, tf, log=print):
 # ---------------------------------------------------------------------------
 # THE REPLAY
 # ---------------------------------------------------------------------------
-def simulate(strategy, series, market, errors=None):
+def simulate(strategy, series, market, errors=None, cost=None):
     """Replays one symbol. Returns a list of trades: {entry_t, exit_t, ret (after costs), exit_i, why}.
     Errors raised by the strategy are counted in `errors` (a dict) rather than stopping the test."""
     o, h, l, c, t = series["o"], series["h"], series["l"], series["c"], series["t"]
-    n, cost, lb = len(c), COST[market], strategy.lookback
+    n, lb = len(c), strategy.lookback
+    cost = COST[market] if cost is None else cost
+    stops = {}
     ts = series.get("_ts")
     if ts is None:
         ts = series["_ts"] = [datetime.fromisoformat(x).timestamp() for x in t]
@@ -263,6 +265,7 @@ def simulate(strategy, series, market, errors=None):
         if pending == "buy" and entry is None and ts[i] >= cool_until:
             entry, entry_i, peak = o[i] * (1 + cost), i, o[i]
             stop = exits.stop_fraction(strategy.stop_loss, c[max(0, i - exits.VOL_WINDOW - 1):i], market, strategy.timeframe)
+            stops[i] = (stop, stop or exits.stop_fraction("smart", c[max(0, i - exits.VOL_WINDOW - 1):i], market, strategy.timeframe))
         elif pending == "sell" and entry is not None:
             trades.append({"entry_i": entry_i, "exit_i": i, "ret": o[i] * (1 - cost) / entry - 1, "why": "signal"})
             entry = None
@@ -313,6 +316,8 @@ def simulate(strategy, series, market, errors=None):
         trades.append({"entry_i": entry_i, "exit_i": n - 1, "ret": c[-1] * (1 - cost) / entry - 1, "why": "end of test"})
     for tr in trades:
         tr["exit_t"] = t[tr["exit_i"]]
+        tr["entry_t"] = t[tr["entry_i"]]
+        tr["stop"], tr["risk"] = stops.get(tr["entry_i"], (None, None))
         tr["bars"] = tr["exit_i"] - tr["entry_i"]
     return trades
 

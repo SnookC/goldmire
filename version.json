@@ -1,6 +1,6 @@
 {
-  "version": "1.5.5",
+  "version": "1.5.6",
   "notes": [
-    "Stocks only: Old Bram (Turtle 55/20) and Ysolde (daily Ichimoku) move from crypto to stocks and sell any coins they still hold; Gareth, Wren, Old Bram and Ysolde get $300 pots, Pip stays at $100"
+    "Fix: a hero leaving crypto also cancels a coin buy order that never filled (Ysolde's WIF/USD)"
   ]
 }

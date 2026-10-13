@@ -632,7 +632,16 @@ def retire_coins(bot, rnd, memory):
                 place_sell(rnd.trading, bot, memory, sym, rnd.positions[norm(sym)], "(retired from crypto: now trades stocks)")
             except Exception as e:  # noqa: BLE001 - try again next round
                 log.error(f"[{bot['name']}] couldn't sell {sym} yet -> {e}")
-        elif norm(sym) not in rnd.open_orders:
+        else:                                    # a coin buy that never filled: cancel it and forget it
+            try:
+                from alpaca.trading.requests import GetOrdersRequest
+                from alpaca.trading.enums import QueryOrderStatus
+                for o in rnd.trading.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN, symbols=[sym])):
+                    rnd.trading.cancel_order_by_id(o.id)
+                    log.info(f"[{bot['name']}] canceled the unfilled {sym} order (retired from crypto)")
+            except Exception as e:  # noqa: BLE001 - try again next round
+                log.error(f"[{bot['name']}] couldn't cancel the {sym} order yet -> {e}")
+                continue
             held.pop(sym, None)
             save_memory(memory)
 

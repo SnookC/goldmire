@@ -183,6 +183,12 @@ THE HERO TRIALS: IS EACH HERO EARNING ITS KEEP?  -- hero_test.py
   names leave out companies that crashed (that flatters results, most of all
   for pennies). Nothing here places trades.
 
+STOCKS ONLY (from version 1.5.5)
+  After the first Hero Trials, crypto was paused: Old Bram now trades stocks with
+  the Turtle 55/20 breakout and Ysolde with the daily Ichimoku cloud (the two best
+  stock strategies in the Trials). Any coins they still held are sold by themselves.
+  Gareth, Wren, Old Bram and Ysolde each have a $300 pot; Pip keeps $100.
+
 SETTINGS UPDATES
   Sometimes an update also changes your heroes' settings (for example after a
   Proving Grounds report). Each change is applied once, logged in bot_log.txt and

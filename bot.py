@@ -168,8 +168,42 @@ SETTINGS_UPDATES = [
     ("2026-10-09-ysolde-hourly", "Ysolde trades crypto through the day (hourly Ichimoku); Old Bram stays daily for comparison", {
         "Crypto-2": {"strategy": "ichimoku_hourly"},
     }),
+    ("2026-10-13-stocks-only", "no more crypto: Old Bram and Ysolde move to stocks (Hero Trials picks); pots raised to $300 (Pip stays $100)", {
+        "Stock-1": {"dollars": 300},
+        "Stock-2": {"dollars": 300},
+        "Crypto-1": {"kind": "stock", "strategy": "turtle_55_20", "watchlist": [], "research": True, "scan": 300, "dollars": 300},
+        "Crypto-2": {"kind": "stock", "strategy": "ichimoku_cloud", "watchlist": [], "research": True, "scan": 300, "dollars": 300},
+    }),
 ]
+# Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
+POT_TOPUPS = [
+    ("2026-10-13-stocks-only", {"Stock-1": 200, "Stock-2": 200, "Crypto-1": 200, "Crypto-2": 200}),
+]
+
+
+def apply_pot_topups(memory, bots):
+    done = set(memory.setdefault("applied_topups", []))
+    names = {b["name"]: b for b in bots}
+    for uid, adds in POT_TOPUPS:
+        if uid in done or uid not in JUST_APPLIED:
+            continue
+        for name, amount in adds.items():
+            if name in names:
+                a = bank._acct(memory, names[name])
+                a["pot"] = round(a["pot"] + amount, 2)
+                log.info(f"[{name}] pot topped up by ${amount:,.2f} to ${a['pot']:,.2f}")
+        done.add(uid)
+        if any(n in names for n in adds):
+            # a hero that moved off crypto starts its research list fresh (no coins on a stock hero's list)
+            lists = memory.setdefault("research", {}).setdefault("lists", {})
+            for name in adds:
+                b = names.get(name)
+                if b and b.get("kind") != "crypto" and any("/" in x for x in lists.get(name, [])):
+                    lists.pop(name, None)
+    memory["applied_topups"] = sorted(done)
+    save_memory(memory)
 TRAINING = []      # what the latest settings update changed, for the town chronicle
+JUST_APPLIED = set()   # settings updates applied in this start-up (pot top-ups follow only these)
 
 
 def apply_settings_updates():
@@ -198,6 +232,7 @@ def apply_settings_updates():
                 log.info(f"Settings update ({title}): [{b['name']}] {k}: {old} -> {v}")
                 TRAINING.append((b, k, v))
         done.add(uid)
+        JUST_APPLIED.add(uid)
     data["applied_updates"] = sorted(done)
     tmp = BOTS_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
@@ -588,8 +623,24 @@ def learned_strategy(bot, rnd, memory):
     return st, fetch, decide
 
 
+def retire_coins(bot, rnd, memory):
+    """A hero that moved from crypto to stocks sells the coins it still holds, once, by itself."""
+    held = held_by(memory, bot)
+    for sym in [s for s in held if "/" in s]:
+        if norm(sym) in rnd.positions:
+            try:
+                place_sell(rnd.trading, bot, memory, sym, rnd.positions[norm(sym)], "(retired from crypto: now trades stocks)")
+            except Exception as e:  # noqa: BLE001 - try again next round
+                log.error(f"[{bot['name']}] couldn't sell {sym} yet -> {e}")
+        elif norm(sym) not in rnd.open_orders:
+            held.pop(sym, None)
+            save_memory(memory)
+
+
 def run_bot(bot, rnd, memory):
     name, kind = bot["name"], bot["kind"]
+    if kind != "crypto" and any("/" in s for s in held_by(memory, bot)):
+        retire_coins(bot, rnd, memory)
     if kind != "crypto" and not rnd.market_open:
         log.info(f"[{name}] market closed, waiting")
         return
@@ -707,7 +758,7 @@ def run_bot(bot, rnd, memory):
         prices = dict(picks)
         candidates = [s for s, _ in picks]
     else:
-        candidates = [s for s in research.watchlist(bot, memory) if norm(s) not in skip]
+        candidates = [s for s in research.watchlist(bot, memory) if norm(s) not in skip and ("/" in s) == (kind == "crypto")]
         prices = {}
     blocked = [s for s in candidates if news.alarm_for(memory, s)]
     if blocked:
@@ -1285,6 +1336,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     news_client = NewsClient(key, secret)
 
     memory = load_memory()
+    apply_pot_topups(memory, bots)
     taught = {}
     for b, k, v in TRAINING:
         h = game.hero_of(b)[0]
@@ -1292,6 +1344,8 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
                 else "a smart stop" if (k, v) == ("stop_loss", "smart")
                 else f"juggling up to {v} trades at once" if k == "max_positions"
                 else "sizing each trade by its risk" if (k, v) == ("sizing", "risk")
+                else "trading stocks instead of coins" if (k, v) == ("kind", "stock")
+                else f"a bigger purse (${v:,})" if k == "dollars"
                 else (("watching every coin Alpaca trades" if b.get("kind") == "crypto" else f"scanning the {v} busiest stocks") if k == "scan" else None))
         if (k, v) == ("benched", True):
             game.record_bench(memory, h)
@@ -1301,7 +1355,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
             continue
         if what:
             untested = k == "strategy" and v in UNTESTED_STRATEGIES
-            taught.setdefault((h, k in ("max_positions", "sizing", "scan") or untested), []).append(what)
+            taught.setdefault((h, k in ("max_positions", "sizing", "scan", "kind", "dollars") or untested), []).append(what)
     for (h, orders), whats in taught.items():
         joined = ", ".join(whats[:-1]) + (" and " if len(whats) > 1 else "") + whats[-1]
         (game.record_orders if orders else game.record_training)(memory, h, joined)

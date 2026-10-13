@@ -1,6 +1,6 @@
 {
-  "version": "1.5.4",
+  "version": "1.5.5",
   "notes": [
-    "Fix: the town could draw only its top row in some browsers (a first-frame timing hiccup stopped the drawing). Now one thing failing to draw can never blank the rest of the town. Trading was never affected"
+    "Stocks only: Old Bram (Turtle 55/20) and Ysolde (daily Ichimoku) move from crypto to stocks and sell any coins they still hold; Gareth, Wren, Old Bram and Ysolde get $300 pots, Pip stays at $100"
   ]
 }

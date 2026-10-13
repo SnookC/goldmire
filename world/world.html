@@ -1035,6 +1035,7 @@ footer { font-size: 12.5px; color: var(--muted); }
   function buildTown() {
     const W = 1024, H = 640;
     const cv = $("town"), ctx = cv.getContext("2d");
+    { const ell = ctx.ellipse; ctx.ellipse = function (x, y, rx, ry, ...rest) { return ell.call(this, x, y, Math.max(0, rx), Math.max(0, ry), ...rest); }; }   // a negative size never stops the drawing
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const rr = (a, b) => a + rnd() * (b - a);
@@ -1910,7 +1911,7 @@ footer { font-size: 12.5px; color: var(--muted); }
       return { grass: rgbHex(m < 0 ? mixHex("#4f8a3a", "#6c6a45", bad) : mixHex("#4f8a3a", "#58993f", good)),
         crop: curse > 0.4 ? "#7a6a3a" : "#7fb050", flowers: good > 0.35 }; }
     function frame(now) {
-      const raw = (now - last) / 1000, dt = Math.min(0.05, raw); last = now; time += dt;
+      const raw = Math.max(0, (now - last) / 1000), dt = Math.min(0.05, raw); last = now; time += dt;   // (a first frame can be stamped slightly before "last")
       if (hiFi && !document.hidden) { perf.t += raw; perf.n++; if (perf.t > 3) { if (perf.n / perf.t < 24 && (window.devicePixelRatio || 1) > 1) { hiFi = false; fit(); } perf.t = 0; perf.n = 0; } }
       mood += (moodOf() - mood) * Math.min(1, dt * 1.2); day += ((state.marketOpen ? 1 : 0) - day) * Math.min(1, dt * 0.8);
       const m = mood, good = Math.max(0, m), bad = Math.max(0, -m), night = 1 - day, curse = curseNow();
@@ -1971,7 +1972,7 @@ footer { font-size: 12.5px; color: var(--muted); }
       PROPS.forEach(p => { if (propShown(p)) items.push({ y: p.y, d: () => drawPropItem(p) }); });
       if (ERA < 3) LINES.forEach(l => { if (l.a.built && l.b.built && !l.a.ruined && !l.b.ruined && night < 0.6) items.push({ y: Math.max(l.a.base, l.b.base) + 1, d: () => drawWashing(l) }); });
       CRITTERS.forEach(c => { if (critterShown(c, night)) items.push({ y: c.y, d: () => drawCritter(c) }); });
-      items.sort((p, q) => p.y - q.y).forEach(it => it.d());
+      items.sort((p, q) => p.y - q.y).forEach(it => { try { it.d(); } catch (e) { if (!frame.warned) { frame.warned = true; console.warn("town: skipped one thing that failed to draw", e); } } });
       // bunting, smoke, sparks
       if (good > 0.3) drawBunting();
       SMOKE.forEach(s => { ctx.fillStyle = `rgba(230,225,215,${0.35 * (1 - s.life / 3)})`; ctx.beginPath(); ctx.arc(s.x, s.y, 3 + s.life * 4, 0, 7); ctx.fill(); });

@@ -1,6 +1,6 @@
 {
-  "version": "1.5.3",
+  "version": "1.5.4",
   "notes": [
-    "The Hero Trials (8_hero_trials.bat): replays each hero exactly as it trades today on real price history and compares it with buying and holding SPY or Bitcoin, using Alpaca's backtesting rules, 4 stretches of time and a double-cost stress test. Read-only: no trading changes"
+    "Fix: the town could draw only its top row in some browsers (a first-frame timing hiccup stopped the drawing). Now one thing failing to draw can never blank the rest of the town. Trading was never affected"
   ]
 }

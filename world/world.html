@@ -192,8 +192,11 @@ section { display: grid; gap: 10px; align-content: start; }
   #printLedger table.per { width: auto; min-width: 60%; margin: 4pt 0 6pt; }
   #printLedger h3.day { font-size: 11.5pt; margin: 11pt 0 2pt; padding-bottom: 1pt; border-bottom: 1.5px solid #000; break-after: avoid; }
   #printLedger h4.hero { font-size: 9.5pt; margin: 5pt 0 1pt; break-after: avoid; }
-  #printLedger h3.day span, #printLedger h4.hero span { font-weight: normal; margin-left: 8pt; font-size: 9pt; }
+  #printLedger h3.day > span, #printLedger h4.hero > span { font-weight: normal; margin-left: 8pt; font-size: 9pt; }
   #printLedger .foot { margin-top: 10pt; font-size: 8pt; }
+  #printLedger { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #printLedger .gain, #printLedger .gain * { color: #1b7a2e !important; font-weight: 700; }
+  #printLedger .loss, #printLedger .loss * { color: #b3261e !important; font-weight: 700; }
 }
 @media (max-width: 560px) { .ledger .tw { display: none; } .ledger .cards { display: grid; } .ledger .lnav b { font-size: 16px; } }
 .newsboard h3 { margin: 0 0 6px; font-family: Almendra, Georgia, serif; font-size: 18px; color: var(--gilt-hi); }
@@ -1127,6 +1130,11 @@ footer { font-size: 12.5px; color: var(--muted); }
     let el = $("printLedger");
     if (!el) { el = document.createElement("div"); el.id = "printLedger"; document.body.appendChild(el); }
     const sort = o.sort || "date";
+    const pc = v => { const n = +v; if (v === "" || v == null || isNaN(n)) return "";       // prices: big ones as whole dollars so they fit
+      return "$" + (n >= 1000 ? Math.round(n).toLocaleString("en-US") : prc(n)); };
+    const tone = v => (+v > 0.004 ? "gain" : +v < -0.004 ? "loss" : "");
+    const money = v => `<span class="${tone(v)}">${usd(+v || 0)}</span>`;
+    const firstDay = [...new Set(o.rows.map(r => r.day))].sort()[0];
     const { done, openBuys } = pairTrades(o.rows);
     const byT = (a, b) => String(a.t).localeCompare(String(b.t));
     const inGroup = { date: byT, "date-desc": (a, b) => byT(b, a), hero: byT,
@@ -1138,21 +1146,21 @@ footer { font-size: 12.5px; color: var(--muted); }
       : sort === "loss" ? sum(groups[a]).pl - sum(groups[b]).pl : shortHero(a).localeCompare(shortHero(b)));
     const days = [...new Set(done.map(r => r.day))].sort();
     if (sort === "date-desc") days.reverse();
-    const boughtCell = r => !r.bought ? "earlier" : md(r.bought) === md(r.t) ? hm(r.bought) : `${md(r.bought)} ${hm(r.bought)}`;
+    const boughtCell = r => !r.bought ? (firstDay ? "before " + md(firstDay + "T12:00:00") : "earlier") : md(r.bought) === md(r.t) ? hm(r.bought) : `${md(r.bought)} ${hm(r.bought)}`;
     const cols = `<colgroup><col style="width:11%"><col style="width:15%"><col style="width:9%"><col style="width:18%"><col style="width:8%"><col style="width:8%"><col></colgroup>`;
     const head = `<tr><th>Symbol</th><th class="nw">Bought</th><th class="nw">Sold</th><th class="n">Paid → sold</th><th class="n">Amount</th><th class="n">Result</th><th>Why</th></tr>`;
     const line = r => r.side === "SELL"
       ? `<tr><td class="nw"><b>${esc(r.symbol)}</b></td><td class="nw">${esc(boughtCell(r))}</td><td class="nw">${esc(hm(r.t))}</td>
-          <td class="n nw">$${prc(r.paid)} → $${prc(r.sold)}</td><td class="n">${num(r.dollars) ? "$" + num(r.dollars) : ""}</td><td class="n nw">${usd(+r.pl || 0)}</td><td>${esc(r.why || "")}</td></tr>`
+          <td class="n nw">${pc(r.paid)} → ${pc(r.sold)}</td><td class="n">${num(r.dollars) ? "$" + num(r.dollars) : ""}</td><td class="n nw">${money(r.pl)}</td><td>${esc(r.why || "")}</td></tr>`
       : `<tr><td class="nw"><b>${esc(r.symbol)}</b></td><td></td><td class="nw">${esc(hm(r.t))}</td><td colspan="3"></td><td>${esc(r.why || "closed outside Goldmire")}</td></tr>`;
     const dayBlocks = days.map(day => {
       const list = done.filter(r => r.day === day);
       const groups = {};
       list.forEach(r => { (groups[r.hero || "?"] = groups[r.hero || "?"] || []).push(r); });
       const s = sum(list);
-      return `<h3 class="day">${esc(dayLabel(day))}<span>${s.n} closed (${s.w} won, ${s.l} lost) · ${usd(s.pl)}</span></h3>`
+      return `<h3 class="day">${esc(dayLabel(day))}<span>${s.n} closed (${s.w} won, ${s.l} lost) · ${money(s.pl)}</span></h3>`
         + heroOrder(groups).map(h => { const g = groups[h].sort(inGroup), hs = sum(g);
-          return `<h4 class="hero">${esc(shortHero(h))}<span>${hs.n} closed · ${usd(hs.pl)}</span></h4><table class="fx">${cols}${head}<tbody>${g.map(line).join("")}</tbody></table>`; }).join("");
+          return `<h4 class="hero">${esc(shortHero(h))}<span>${hs.n} closed · ${money(hs.pl)}</span></h4><table class="fx">${cols}${head}<tbody>${g.map(line).join("")}</tbody></table>`; }).join("");
     }).join("");
     // still holding, by hero
     const hg = {};
@@ -1163,16 +1171,16 @@ footer { font-size: 12.5px; color: var(--muted); }
     const holdHead = `<tr><th>Symbol</th><th class="nw">Bought</th><th class="n">Paid</th><th class="n">Now</th><th class="n">Value</th><th class="n">So far</th></tr>`;
     const holdBlocks = Object.keys(hg).sort((a, b) => shortHero(a).localeCompare(shortHero(b))).map(h => {
       const g = hg[h].sort(hsort), pl = g.reduce((a, x) => a + (+x.pl || 0), 0);
-      return `<h4 class="hero">${esc(shortHero(h))}<span>${g.length} held · ${usd(pl)} so far</span></h4><table class="fx">${hcols}${holdHead}<tbody>${g.map(x =>
-        `<tr><td class="nw"><b>${esc(x.symbol)}</b></td><td class="nw">${x.since ? esc(md(x.since)) : ""}</td><td class="n">$${prc(x.paid)}</td><td class="n">$${prc(x.now)}</td>
-         <td class="n">${num(x.value) ? "$" + num(x.value) : ""}</td><td class="n nw">${usd(+x.pl || 0)}</td></tr>`).join("")}</tbody></table>`; }).join("");
+      return `<h4 class="hero">${esc(shortHero(h))}<span>${g.length} held · ${money(pl)} so far</span></h4><table class="fx">${hcols}${holdHead}<tbody>${g.map(x =>
+        `<tr><td class="nw"><b>${esc(x.symbol)}</b></td><td class="nw">${x.since ? esc(md(x.since)) : ""}</td><td class="n">${pc(x.paid)}</td><td class="n">${pc(x.now)}</td>
+         <td class="n">${num(x.value) ? "$" + num(x.value) : ""}</td><td class="n nw">${money(x.pl)}</td></tr>`).join("")}</tbody></table>`; }).join("");
     // buys in these days that neither sold here nor show as held at the end (e.g. still pending, or sold later)
     const heldKey = new Set((o.hold || []).map(x => x.bot + "|" + x.symbol));
     const other = openBuys.filter(b => !heldKey.has(b.bot + "|" + b.symbol));
     const otherTable = other.length ? `<h3 class="day">Other buys<span>not sold in these days</span></h3><table><tr><th class="nw">When</th><th>Hero</th><th>Symbol</th><th class="n">Paid</th><th class="n">Amount</th></tr>${other.map(b =>
-      `<tr><td class="nw">${esc(md(b.t))} ${esc(hm(b.t))}</td><td>${esc(shortHero(b.hero))}</td><td><b>${esc(b.symbol)}</b></td><td class="n">$${prc(b.paid)}</td><td class="n">${num(b.dollars) ? "$" + num(b.dollars) : ""}</td></tr>`).join("")}</table>` : "";
+      `<tr><td class="nw">${esc(md(b.t))} ${esc(hm(b.t))}</td><td>${esc(shortHero(b.hero))}</td><td><b>${esc(b.symbol)}</b></td><td class="n">${pc(b.paid)}</td><td class="n">${num(b.dollars) ? "$" + num(b.dollars) : ""}</td></tr>`).join("")}</table>` : "";
     const per = (o.per || []).length > 1 ? `<table class="per"><tr><th>Hero</th><th class="n">Closed</th><th class="n">Won</th><th class="n">Lost</th><th class="n">Result</th><th class="n">Bought</th></tr>${o.per.map(p =>
-      `<tr><td>${esc(shortHero(p.hero))}</td><td class="n">${p.trades}</td><td class="n">${p.wins}</td><td class="n">${p.losses}</td><td class="n">${p.trades ? usd(p.pl) : ""}</td><td class="n">${p.buys}</td></tr>`).join("")}</table>` : "";
+      `<tr><td>${esc(shortHero(p.hero))}</td><td class="n">${p.trades}</td><td class="n">${p.wins}</td><td class="n">${p.losses}</td><td class="n">${p.trades ? money(p.pl) : ""}</td><td class="n">${p.buys}</td></tr>`).join("")}</table>` : "";
     el.innerHTML = `<h1>${esc(o.title)}</h1><p><b>${esc(o.sub)}</b></p><p>${o.summary}</p>${per}
       ${dayBlocks || "<p>No trades closed in these days.</p>"}
       ${holdBlocks ? `<h3 class="day">Still holding<span>${o.holdDay ? esc(dayLabel(o.holdDay)) : ""}</span></h3>${holdBlocks}` : ""}
@@ -1191,7 +1199,7 @@ footer { font-size: 12.5px; color: var(--muted); }
     rows.forEach(r => { const p = per[r.hero] || (per[r.hero] = { hero: r.hero, trades: 0, wins: 0, losses: 0, pl: 0, buys: 0 });
       if (r.side === "BUY") p.buys++; if (r.side === "SELL") { p.trades++; p.pl += +r.pl || 0; if (+r.pl > 0) p.wins++; else p.losses++; } });
     printCompact({ title: "Goldmire · The Day's Ledger", sub: `${dayLabel(rep.day)}, ${rep.day}`,
-      summary: `${esc(rep.headline || "")}<br>Closed trades: ${usd(rep.closed_pl || 0)} (${rep.wins || 0} won, ${rep.losses || 0} lost)${rep.account && rep.account.change != null ? ` · Whole account today: ${usd(rep.account.change)}, worth $${num(rep.account.equity)}` : ""}`,
+      summary: `${esc(rep.headline || "")}<br>Closed trades: <span class="${rep.closed_pl > 0 ? "gain" : rep.closed_pl < 0 ? "loss" : ""}">${usd(rep.closed_pl || 0)}</span> (${rep.wins || 0} won, ${rep.losses || 0} lost)${rep.account && rep.account.change != null ? ` · Whole account today: ${usd(rep.account.change)}, worth $${num(rep.account.equity)}` : ""}`,
       per: Object.values(per).sort((a, b) => shortHero(a.hero).localeCompare(shortHero(b.hero))), rows, hold: rep.holding || [], holdDay: rep.has_holdings ? rep.day : null,
       sort: "date", file: `goldmire-ledger-${rep.day}`,
       notes: [rep.partial_from ? "The trade journal started partway through this day; earlier trades aren't listed." : "",
@@ -1199,7 +1207,7 @@ footer { font-size: 12.5px; color: var(--muted); }
   }
   function exportSearchPDF(res) {
     printCompact({ title: "Goldmire · Ledger Search", sub: `${res.rangeLabel} · ${res.heroesLabel}`,
-      summary: `Closed trades: ${usd(res.total.pl)} (${res.total.wins} won, ${res.total.losses} lost) · ${res.total.buys} new buys`,
+      summary: `Closed trades: <span class="${res.total.pl > 0 ? "gain" : res.total.pl < 0 ? "loss" : ""}">${usd(res.total.pl)}</span> (${res.total.wins} won, ${res.total.losses} lost) · ${res.total.buys} new buys`,
       per: res.perList, rows: res.rowsByDay, hold: res.hold, holdDay: res.holdDay, sort: res.sort, file: res.file,
       notes: [res.noReport.length ? `No ledger was saved for ${res.noReport.map(dayLabel).join(", ")}.` : "",
         res.partial ? "Some of these days started their trade journal partway through, so a few early trades may be missing." : ""].filter(Boolean) });

@@ -183,6 +183,17 @@ section { display: grid; gap: 10px; align-content: start; }
   #printLedger th { background: #eee; }
   #printLedger td.n, #printLedger th.n { text-align: right; }
   #printLedger tr { break-inside: avoid; }
+  #printLedger table { font-size: 8.5pt; margin-bottom: 2pt; }
+  #printLedger th, #printLedger td { padding: 1.5pt 4pt; }
+  #printLedger .nw { white-space: nowrap; }
+  #printLedger table.fx { table-layout: fixed; }
+  #printLedger table.fx td { overflow: hidden; text-overflow: ellipsis; }
+  #printLedger table.fx td:last-child { white-space: normal; }
+  #printLedger table.per { width: auto; min-width: 60%; margin: 4pt 0 6pt; }
+  #printLedger h3.day { font-size: 11.5pt; margin: 11pt 0 2pt; padding-bottom: 1pt; border-bottom: 1.5px solid #000; break-after: avoid; }
+  #printLedger h4.hero { font-size: 9.5pt; margin: 5pt 0 1pt; break-after: avoid; }
+  #printLedger h3.day span, #printLedger h4.hero span { font-weight: normal; margin-left: 8pt; font-size: 9pt; }
+  #printLedger .foot { margin-top: 10pt; font-size: 8pt; }
 }
 @media (max-width: 560px) { .ledger .tw { display: none; } .ledger .cards { display: grid; } .ledger .lnav b { font-size: 16px; } }
 .newsboard h3 { margin: 0 0 6px; font-family: Almendra, Georgia, serif; font-size: 18px; color: var(--gilt-hi); }
@@ -936,27 +947,6 @@ footer { font-size: 12.5px; color: var(--muted); }
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
-  function exportPDF(rep) {
-    let el = $("printLedger");
-    if (!el) { el = document.createElement("div"); el.id = "printLedger"; document.body.appendChild(el); }
-    const rows = ledgerRows(rep).map(r => `<tr><td>${esc(stamp(r.t)[1])}</td><td>${r.side}</td><td>${esc(r.hero || "")}</td><td><b>${esc(r.symbol || "")}</b></td>
-      <td class="n">${prc(r.paid) ? "$" + prc(r.paid) : ""}</td><td class="n">${prc(r.sold) ? "$" + prc(r.sold) : ""}</td><td class="n">${num(r.dollars) ? "$" + num(r.dollars) : ""}</td>
-      <td class="n">${r.pl === "" ? "" : usd(r.pl)}</td><td>${esc(r.why || "")}</td></tr>`).join("");
-    const hold = (rep.holding || []).map(h => `<tr><td>${esc(h.hero)}</td><td><b>${esc(h.symbol)}</b></td><td class="n">$${prc(h.paid)}</td><td class="n">$${prc(h.now)}</td>
-      <td class="n">${num(h.value) ? "$" + num(h.value) : ""}</td><td class="n">${usd(h.pl)}</td><td class="n">${usd(h.today)}</td></tr>`).join("");
-    el.innerHTML = `<h1>Goldmire · The Day's Ledger</h1><p><b>${esc(dayLabel(rep.day))}</b>, ${esc(rep.day)}</p><p>${esc(rep.headline || "")}</p>
-      <p>Closed trades: ${usd(rep.closed_pl || 0)} (${rep.wins || 0} won, ${rep.losses || 0} lost)${rep.account && rep.account.change != null ? ` · Whole account today: ${usd(rep.account.change)}, worth $${num(rep.account.equity)}` : ""}</p>
-      ${rep.partial_from ? "<p><i>The trade journal started partway through this day; earlier trades aren't listed.</i></p>" : ""}
-      ${!rep.buys && rep.bought ? `<p><i>This day was saved before buys were listed; it had ${rep.bought} buy(s).</i></p>` : ""}
-      <h2>Every trade</h2>${rows ? `<table><thead><tr><th>Time</th><th>Side</th><th>Hero</th><th>Symbol</th><th class="n">Paid</th><th class="n">Sold</th><th class="n">Amount</th><th class="n">Result</th><th>Why</th></tr></thead><tbody>${rows}</tbody></table>` : "<p>No trades.</p>"}
-      ${hold ? `<h2>Still holding</h2><table><thead><tr><th>Hero</th><th>Symbol</th><th class="n">Paid</th><th class="n">Now</th><th class="n">Value</th><th class="n">So far</th><th class="n">Today</th></tr></thead><tbody>${hold}</tbody></table>` : ""}
-      <p style="margin-top:12pt;font-size:9pt">Paper trading only. Times are this device's local time. Made ${esc(new Date().toLocaleString())}.</p>`;
-    const title = document.title;
-    document.title = `goldmire-ledger-${rep.day}`;     // becomes the PDF's file name
-    const done = () => { document.title = title; window.removeEventListener("afterprint", done); };
-    window.addEventListener("afterprint", done);
-    window.print();
-  }
   async function loadDay(day) {
     if (ledger.loading || ledger.cache[day]) return;
     ledger.loading = true;
@@ -1036,7 +1026,8 @@ footer { font-size: 12.5px; color: var(--muted); }
     if (missing.length) return { loading: missing, days };
     const want = h => !q.heroes || q.heroes.has(h);
     const rows = [];
-    reps.forEach(r => ledgerRows(r).forEach(x => { if (want(x.hero)) rows.push(x); }));
+    reps.forEach(r => ledgerRows(r).forEach(x => { if (want(x.hero)) rows.push({ ...x, day: r.day }); }));
+    const rowsByDay = rows.slice();
     const plv = x => (x.pl === "" || x.pl == null ? null : +x.pl);
     const byDate = (a, b) => String(a.t).localeCompare(String(b.t));
     const sorters = { date: byDate, "date-desc": (a, b) => byDate(b, a),
@@ -1060,7 +1051,7 @@ footer { font-size: 12.5px; color: var(--muted); }
     const heroesLabel = q.heroes ? [...q.heroes].map(shortHero).join(", ") : "All heroes";
     const rangeLabel = days.length ? (days[0] === days[days.length - 1] ? dayLabel(days[0]) : `${dayLabel(days[0])} to ${dayLabel(days[days.length - 1])}`) : "";
     const noReport = reps.filter(r => r.missing).map(r => r.day);
-    return { days, rows, total, perList, hold, holdDay: last?.day, heroesLabel, rangeLabel, noReport, partial: reps.some(r => r.partial_from),
+    return { days, rows, rowsByDay, sort: q.sort, total, perList, hold, holdDay: last?.day, heroesLabel, rangeLabel, noReport, partial: reps.some(r => r.partial_from),
       file: `goldmire-ledger-${q.from}${q.from === q.to ? "" : "_to_" + q.to}${q.heroes ? "-" + [...q.heroes].map(shortHero).join("-") : ""}` };
   }
   function renderSearch(box) {
@@ -1115,29 +1106,105 @@ footer { font-size: 12.5px; color: var(--muted); }
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
-  function exportSearchPDF(res) {
+  // ---- the PDFs: days → heroes → one line per finished trade (its buy and its sell joined) ----
+  const hm = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); };
+  const md = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString([], { month: "short", day: "numeric" }); };
+  function pairTrades(rows) {     // each sell finds the buy it closed (same hero + symbol, before it, closest price)
+    const buys = rows.filter(r => r.side === "BUY").sort((a, b) => String(a.t).localeCompare(String(b.t)));
+    const used = new Set();
+    const done = rows.filter(r => r.side !== "BUY").map(r => {
+      if (r.side !== "SELL") return { ...r, bought: null };
+      let best = null;
+      buys.forEach(b => { if (used.has(b) || b.bot !== r.bot || b.symbol !== r.symbol || String(b.t) > String(r.t)) return;
+        if (!best || Math.abs(+b.paid - +r.paid) < Math.abs(+best.paid - +r.paid) - 1e-9) best = b; });
+      if (best) used.add(best);
+      return { ...r, bought: best ? best.t : null };
+    });
+    return { done, openBuys: buys.filter(b => !used.has(b)) };
+  }
+  // o: { title, sub, summary, per, rows (ledger rows with .day), hold, holdDay, sort, notes, file }
+  function printCompact(o) {
     let el = $("printLedger");
     if (!el) { el = document.createElement("div"); el.id = "printLedger"; document.body.appendChild(el); }
-    const side = r => r.side === "BUY" ? "BUY" : r.side === "SELL" ? "SELL" : "GONE";
-    const rows = res.rows.map(r => { const [d, tm] = stamp(r.t); return `<tr><td>${esc(d)} ${esc(tm)}</td><td>${side(r)}</td><td>${esc(r.hero || "")}</td><td><b>${esc(r.symbol || "")}</b></td>
-      <td class="n">${prc(r.paid) ? "$" + prc(r.paid) : ""}</td><td class="n">${prc(r.sold) ? "$" + prc(r.sold) : ""}</td><td class="n">${num(r.dollars) ? "$" + num(r.dollars) : ""}</td>
-      <td class="n">${r.pl === "" ? "" : usd(+r.pl)}</td><td>${esc(r.why || "")}</td></tr>`; }).join("");
-    const per = res.perList.map(p => `<tr><td>${esc(p.hero)}</td><td class="n">${p.trades}</td><td class="n">${p.wins}</td><td class="n">${p.losses}</td><td class="n">${p.trades ? usd(p.pl) : ""}</td><td class="n">${p.buys}</td></tr>`).join("");
-    const hold = res.hold.map(h => `<tr><td>${esc(h.hero)}</td><td><b>${esc(h.symbol)}</b></td><td class="n">$${prc(h.paid)}</td><td class="n">$${prc(h.now)}</td>
-      <td class="n">${num(h.value) ? "$" + num(h.value) : ""}</td><td class="n">${usd(h.pl)}</td></tr>`).join("");
-    el.innerHTML = `<h1>Goldmire · Ledger Search</h1><p><b>${esc(res.rangeLabel)}</b> · ${esc(res.heroesLabel)}</p>
-      <p>Closed trades: ${usd(res.total.pl)} (${res.total.wins} won, ${res.total.losses} lost) · ${res.total.buys} new buys</p>
-      ${per ? `<h2>By hero</h2><table><thead><tr><th>Hero</th><th class="n">Closed</th><th class="n">Won</th><th class="n">Lost</th><th class="n">Result</th><th class="n">Bought</th></tr></thead><tbody>${per}</tbody></table>` : ""}
-      <h2>Every trade</h2>${rows ? `<table><thead><tr><th>When</th><th>Side</th><th>Hero</th><th>Symbol</th><th class="n">Paid</th><th class="n">Sold</th><th class="n">Amount</th><th class="n">Result</th><th>Why</th></tr></thead><tbody>${rows}</tbody></table>` : "<p>No trades.</p>"}
-      ${hold ? `<h2>Still holding · ${esc(dayLabel(res.holdDay))}</h2><table><thead><tr><th>Hero</th><th>Symbol</th><th class="n">Paid</th><th class="n">Now</th><th class="n">Value</th><th class="n">So far</th></tr></thead><tbody>${hold}</tbody></table>` : ""}
-      ${res.noReport.length ? `<p><i>No ledger was saved for ${esc(res.noReport.map(dayLabel).join(", "))}.</i></p>` : ""}
-      <p style="margin-top:12pt;font-size:9pt">Paper trading only. Times are this device's local time. Made ${esc(new Date().toLocaleString())}.</p>`;
+    const sort = o.sort || "date";
+    const { done, openBuys } = pairTrades(o.rows);
+    const byT = (a, b) => String(a.t).localeCompare(String(b.t));
+    const inGroup = { date: byT, "date-desc": (a, b) => byT(b, a), hero: byT,
+      profit: (a, b) => ((+b.pl || 0) - (+a.pl || 0)) || byT(a, b), loss: (a, b) => ((+a.pl || 0) - (+b.pl || 0)) || byT(a, b),
+      symbol: (a, b) => String(a.symbol).localeCompare(String(b.symbol)) || byT(a, b) }[sort] || byT;
+    const sum = list => { const s = list.filter(r => r.side === "SELL"); const pl = s.reduce((a, r) => a + (+r.pl || 0), 0);
+      const w = s.filter(r => +r.pl > 0).length; return { n: s.length, w, l: s.length - w, pl }; };
+    const heroOrder = (groups) => Object.keys(groups).sort((a, b) => sort === "profit" ? sum(groups[b]).pl - sum(groups[a]).pl
+      : sort === "loss" ? sum(groups[a]).pl - sum(groups[b]).pl : shortHero(a).localeCompare(shortHero(b)));
+    const days = [...new Set(done.map(r => r.day))].sort();
+    if (sort === "date-desc") days.reverse();
+    const boughtCell = r => !r.bought ? "earlier" : md(r.bought) === md(r.t) ? hm(r.bought) : `${md(r.bought)} ${hm(r.bought)}`;
+    const cols = `<colgroup><col style="width:11%"><col style="width:15%"><col style="width:9%"><col style="width:18%"><col style="width:8%"><col style="width:8%"><col></colgroup>`;
+    const head = `<tr><th>Symbol</th><th class="nw">Bought</th><th class="nw">Sold</th><th class="n">Paid → sold</th><th class="n">Amount</th><th class="n">Result</th><th>Why</th></tr>`;
+    const line = r => r.side === "SELL"
+      ? `<tr><td class="nw"><b>${esc(r.symbol)}</b></td><td class="nw">${esc(boughtCell(r))}</td><td class="nw">${esc(hm(r.t))}</td>
+          <td class="n nw">$${prc(r.paid)} → $${prc(r.sold)}</td><td class="n">${num(r.dollars) ? "$" + num(r.dollars) : ""}</td><td class="n nw">${usd(+r.pl || 0)}</td><td>${esc(r.why || "")}</td></tr>`
+      : `<tr><td class="nw"><b>${esc(r.symbol)}</b></td><td></td><td class="nw">${esc(hm(r.t))}</td><td colspan="3"></td><td>${esc(r.why || "closed outside Goldmire")}</td></tr>`;
+    const dayBlocks = days.map(day => {
+      const list = done.filter(r => r.day === day);
+      const groups = {};
+      list.forEach(r => { (groups[r.hero || "?"] = groups[r.hero || "?"] || []).push(r); });
+      const s = sum(list);
+      return `<h3 class="day">${esc(dayLabel(day))}<span>${s.n} closed (${s.w} won, ${s.l} lost) · ${usd(s.pl)}</span></h3>`
+        + heroOrder(groups).map(h => { const g = groups[h].sort(inGroup), hs = sum(g);
+          return `<h4 class="hero">${esc(shortHero(h))}<span>${hs.n} closed · ${usd(hs.pl)}</span></h4><table class="fx">${cols}${head}<tbody>${g.map(line).join("")}</tbody></table>`; }).join("");
+    }).join("");
+    // still holding, by hero
+    const hg = {};
+    (o.hold || []).forEach(x => { (hg[x.hero] = hg[x.hero] || []).push(x); });
+    const hsort = { profit: (a, b) => b.pl - a.pl, loss: (a, b) => a.pl - b.pl, symbol: (a, b) => String(a.symbol).localeCompare(String(b.symbol)) }[sort]
+      || ((a, b) => String(a.since || "").localeCompare(String(b.since || "")));
+    const hcols = `<colgroup><col style="width:11%"><col style="width:13%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col></colgroup>`;
+    const holdHead = `<tr><th>Symbol</th><th class="nw">Bought</th><th class="n">Paid</th><th class="n">Now</th><th class="n">Value</th><th class="n">So far</th></tr>`;
+    const holdBlocks = Object.keys(hg).sort((a, b) => shortHero(a).localeCompare(shortHero(b))).map(h => {
+      const g = hg[h].sort(hsort), pl = g.reduce((a, x) => a + (+x.pl || 0), 0);
+      return `<h4 class="hero">${esc(shortHero(h))}<span>${g.length} held · ${usd(pl)} so far</span></h4><table class="fx">${hcols}${holdHead}<tbody>${g.map(x =>
+        `<tr><td class="nw"><b>${esc(x.symbol)}</b></td><td class="nw">${x.since ? esc(md(x.since)) : ""}</td><td class="n">$${prc(x.paid)}</td><td class="n">$${prc(x.now)}</td>
+         <td class="n">${num(x.value) ? "$" + num(x.value) : ""}</td><td class="n nw">${usd(+x.pl || 0)}</td></tr>`).join("")}</tbody></table>`; }).join("");
+    // buys in these days that neither sold here nor show as held at the end (e.g. still pending, or sold later)
+    const heldKey = new Set((o.hold || []).map(x => x.bot + "|" + x.symbol));
+    const other = openBuys.filter(b => !heldKey.has(b.bot + "|" + b.symbol));
+    const otherTable = other.length ? `<h3 class="day">Other buys<span>not sold in these days</span></h3><table><tr><th class="nw">When</th><th>Hero</th><th>Symbol</th><th class="n">Paid</th><th class="n">Amount</th></tr>${other.map(b =>
+      `<tr><td class="nw">${esc(md(b.t))} ${esc(hm(b.t))}</td><td>${esc(shortHero(b.hero))}</td><td><b>${esc(b.symbol)}</b></td><td class="n">$${prc(b.paid)}</td><td class="n">${num(b.dollars) ? "$" + num(b.dollars) : ""}</td></tr>`).join("")}</table>` : "";
+    const per = (o.per || []).length > 1 ? `<table class="per"><tr><th>Hero</th><th class="n">Closed</th><th class="n">Won</th><th class="n">Lost</th><th class="n">Result</th><th class="n">Bought</th></tr>${o.per.map(p =>
+      `<tr><td>${esc(shortHero(p.hero))}</td><td class="n">${p.trades}</td><td class="n">${p.wins}</td><td class="n">${p.losses}</td><td class="n">${p.trades ? usd(p.pl) : ""}</td><td class="n">${p.buys}</td></tr>`).join("")}</table>` : "";
+    el.innerHTML = `<h1>${esc(o.title)}</h1><p><b>${esc(o.sub)}</b></p><p>${o.summary}</p>${per}
+      ${dayBlocks || "<p>No trades closed in these days.</p>"}
+      ${holdBlocks ? `<h3 class="day">Still holding<span>${o.holdDay ? esc(dayLabel(o.holdDay)) : ""}</span></h3>${holdBlocks}` : ""}
+      ${otherTable}
+      ${(o.notes || []).map(n => `<p><i>${esc(n)}</i></p>`).join("")}
+      <p class="foot">Each line is one finished trade: when it was bought, when it was sold, and the result. Paper trading only. Times are this device's local time. Made ${esc(new Date().toLocaleString())}.</p>`;
     const title = document.title;
-    document.title = res.file;     // becomes the PDF's file name
-    const done = () => { document.title = title; window.removeEventListener("afterprint", done); };
-    window.addEventListener("afterprint", done);
+    document.title = o.file;     // becomes the PDF's file name
+    const fin = () => { document.title = title; window.removeEventListener("afterprint", fin); };
+    window.addEventListener("afterprint", fin);
     window.print();
   }
+  function exportPDF(rep) {
+    const rows = ledgerRows(rep).map(r => ({ ...r, day: rep.day }));
+    const per = {};
+    rows.forEach(r => { const p = per[r.hero] || (per[r.hero] = { hero: r.hero, trades: 0, wins: 0, losses: 0, pl: 0, buys: 0 });
+      if (r.side === "BUY") p.buys++; if (r.side === "SELL") { p.trades++; p.pl += +r.pl || 0; if (+r.pl > 0) p.wins++; else p.losses++; } });
+    printCompact({ title: "Goldmire · The Day's Ledger", sub: `${dayLabel(rep.day)}, ${rep.day}`,
+      summary: `${esc(rep.headline || "")}<br>Closed trades: ${usd(rep.closed_pl || 0)} (${rep.wins || 0} won, ${rep.losses || 0} lost)${rep.account && rep.account.change != null ? ` · Whole account today: ${usd(rep.account.change)}, worth $${num(rep.account.equity)}` : ""}`,
+      per: Object.values(per).sort((a, b) => shortHero(a.hero).localeCompare(shortHero(b.hero))), rows, hold: rep.holding || [], holdDay: rep.has_holdings ? rep.day : null,
+      sort: "date", file: `goldmire-ledger-${rep.day}`,
+      notes: [rep.partial_from ? "The trade journal started partway through this day; earlier trades aren't listed." : "",
+        !rep.buys && rep.bought ? `This day was saved before buys were listed; it had ${rep.bought} buy(s).` : ""].filter(Boolean) });
+  }
+  function exportSearchPDF(res) {
+    printCompact({ title: "Goldmire · Ledger Search", sub: `${res.rangeLabel} · ${res.heroesLabel}`,
+      summary: `Closed trades: ${usd(res.total.pl)} (${res.total.wins} won, ${res.total.losses} lost) · ${res.total.buys} new buys`,
+      per: res.perList, rows: res.rowsByDay, hold: res.hold, holdDay: res.holdDay, sort: res.sort, file: res.file,
+      notes: [res.noReport.length ? `No ledger was saved for ${res.noReport.map(dayLabel).join(", ")}.` : "",
+        res.partial ? "Some of these days started their trade journal partway through, so a few early trades may be missing." : ""].filter(Boolean) });
+  }
+
 
   // =====================================================================
   // UPDATES: the "Update ready" button (only when Goldmire on your PC serves this page)

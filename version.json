@@ -1,6 +1,6 @@
 {
-  "version": "1.5.8",
+  "version": "1.5.9",
   "notes": [
-    "Ledger search: a Generate PDF button makes the PDF for your chosen days, heroes and sort in one click"
+    "Shorter ledger PDFs: grouped by day and hero, one line per finished trade (buy and sell joined) - a 10-day search went from 11 pages to 4"
   ]
 }

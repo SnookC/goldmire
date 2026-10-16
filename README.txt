@@ -276,6 +276,9 @@ THE DAY'S LEDGER: YOUR END-OF-DAY REPORT  -- report.py
   bottom of the ledger click
     Spreadsheet  - downloads goldmire-ledger-<date>.csv (opens in Excel)
     PDF          - opens the print window; pick "Save as PDF" as the printer
+  The PDF is grouped by day, then by hero, with one line per finished trade
+  (when it was bought, when it sold, prices, result and why) and what each
+  hero still holds. The spreadsheet keeps one line per buy and per sell.
   Both list every buy and sell that day (time, hero, symbol, prices, amount,
   result and why it sold) and what's still held. Days saved before version
   1.4.2 show their sells only; buys are listed from 1.4.2 on.

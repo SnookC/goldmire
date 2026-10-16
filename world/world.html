@@ -160,6 +160,14 @@ section { display: grid; gap: 10px; align-content: start; }
 .ledger .cards .r2 { color: var(--muted); font-size: 12.5px; }
 .ledger .lexp { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ledger .lexp button { padding: 8px 14px; }
+.ledger .lsearch { border: 1px solid #3a4532; border-radius: 10px; background: #12180f; padding: 8px 10px; }
+.ledger .lsearch summary { cursor: pointer; font-weight: 700; color: var(--gilt-hi); }
+.ledger .lsrow { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 8px; }
+.ledger .lsrow label { display: inline-flex; gap: 6px; align-items: center; }
+.ledger .lsrow select { font: inherit; color: inherit; background: #0d120b; border: 1px solid #3a4532; border-radius: 8px; padding: 6px 8px; min-height: 38px; max-width: 100%; }
+.ledger .hchk { border: 1px solid #3a4532; border-radius: 8px; padding: 6px 10px; min-height: 38px; cursor: pointer; }
+.ledger .hchk input { width: 18px; height: 18px; }
+.ledger .lsmsg { color: var(--loss); }
 #printLedger { display: none; }
 @media print {
   body > *:not(#printLedger) { display: none !important; }
@@ -860,12 +868,13 @@ footer { font-size: 12.5px; color: var(--muted); }
     const box = $("ledger"), t = state.today;
     if (!t) { box.innerHTML = `<p class="note">The ledger fills in once the heroes have traded. A report is saved every day at 4:05 PM New York time.</p>`; return; }
     loadIndex();
+    if (ledger.mode === "search" && ledger.q) return renderSearch(box);
     const days = ledgerDays(), cur = ledger.day || t.day, i = days.indexOf(cur);
     const rep = cur === t.day ? t : ledger.cache[cur];
     const nav = `<div class="lnav"><button type="button" data-ld="${esc(days[i + 1] || "")}" ${days[i + 1] ? "" : "disabled"} aria-label="Older day">‹</button>
       <b>${cur === t.day ? "Today so far · " : ""}${esc(dayLabel(cur))}</b>
       <button type="button" data-ld="${esc(days[i - 1] || "")}" ${i > 0 ? "" : "disabled"} aria-label="Newer day">›</button></div>`;
-    if (!rep) { box.innerHTML = nav + `<p class="note">Opening the ledger for ${esc(dayLabel(cur))}…</p>`; bindLedger(); loadDay(cur); return; }
+    if (!rep) { box.innerHTML = searchBar() + nav + `<p class="note">Opening the ledger for ${esc(dayLabel(cur))}…</p>`; bindLedger(); bindSearch(); loadDay(cur); return; }
     const c = v => v > 0 ? "up" : v < 0 ? "dn" : "";
     const tiles = [["Closed trades", `<span class="${c(rep.closed_pl)}">${usd(rep.closed_pl)}</span>`],
       ["Won / lost", `${rep.wins} / ${rep.losses}`],
@@ -880,7 +889,7 @@ footer { font-size: 12.5px; color: var(--muted); }
       <div class="r2">${esc(x.hero)} · paid ${px(x.paid)}, now ${px(x.now)}</div><div class="r2">today <span class="${c(x.today)}">${usd(x.today)}</span></div></li>`);
     const hold = (rep.holding || []).map(x => `<tr><td>${esc(x.hero)}</td><td><b>${esc(x.symbol)}</b></td><td class="n">${px(x.paid)}</td>
       <td class="n">${px(x.now)}</td><td class="n ${c(x.pl)}">${usd(x.pl)}</td><td class="n ${c(x.today)}">${usd(x.today)}</td></tr>`).join("");
-    box.innerHTML = nav + `<p class="head">${esc(rep.headline || "")}${rep.demo ? " <span class=\"note\">(example)</span>" : ""}</p>
+    box.innerHTML = searchBar() + nav + `<p class="head">${esc(rep.headline || "")}${rep.demo ? " <span class=\"note\">(example)</span>" : ""}</p>
       <div class="tiles">${tiles.map(([k, v]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("")}</div>
       <h3>Closed trades</h3>` + (closed ? `<div class="tw"><table><thead><tr><th>Time</th><th>Hero</th><th>Symbol</th><th class="n">Paid → sold</th><th class="n">Result</th><th>Why it sold</th></tr></thead><tbody>${closed}</tbody></table></div>` + closedCards
         : `<p class="note">No trades closed ${cur === t.day ? "yet today" : "that day"}.</p>`)
@@ -890,7 +899,7 @@ footer { font-size: 12.5px; color: var(--muted); }
       + ((rep.gone || []).length ? `<p class="note">Closed outside Goldmire (or a buy that didn't fill): ${esc(rep.gone.map(g => g.symbol).join(", "))}.</p>` : "")
       + `<div class="lexp"><button type="button" data-exp="csv">⬇ Spreadsheet</button><button type="button" data-exp="pdf">⬇ PDF</button>
          <span class="note">Every trade this day, ready to hand off.</span></div>`;
-    bindLedger();
+    bindLedger(); bindSearch();
     box.querySelectorAll("[data-exp]").forEach(b => b.addEventListener("click", () => b.dataset.exp === "csv" ? exportCSV(rep) : exportPDF(rep)));
   }
   function bindLedger() { $("ledger").querySelectorAll("[data-ld]").forEach(b => b.addEventListener("click", () => { if (b.dataset.ld) { ledger.day = b.dataset.ld; renderLedger(); } })); }
@@ -951,9 +960,179 @@ footer { font-size: 12.5px; color: var(--muted); }
   async function loadDay(day) {
     if (ledger.loading || ledger.cache[day]) return;
     ledger.loading = true;
-    try { const r = await fetch(`reports/${day}.json?t=${Date.now()}`, { cache: "no-store" }); if (r.ok) ledger.cache[day] = await r.json(); else ledger.cache[day] = { day, headline: "No report was saved for this day.", closed: [], wins: 0, losses: 0, closed_pl: 0 }; }
-    catch (_) { ledger.cache[day] = { day, headline: "Couldn't open this day's report (is the PC reachable?).", closed: [], wins: 0, losses: 0, closed_pl: 0 }; }
+    try { const r = await fetch(`reports/${day}.json?t=${Date.now()}`, { cache: "no-store" }); if (r.ok) ledger.cache[day] = await r.json(); else ledger.cache[day] = { day, missing: true, headline: "No report was saved for this day.", closed: [], wins: 0, losses: 0, closed_pl: 0 }; }
+    catch (_) { ledger.cache[day] = { day, missing: true, headline: "Couldn't open this day's report (is the PC reachable?).", closed: [], wins: 0, losses: 0, closed_pl: 0 }; }
     ledger.loading = false; if (ledger.day === day) renderLedger();
+  }
+
+  // ---- searching the ledgers: a range of days, some or all heroes, optional sorting ----
+  // ledger.form = what's ticked in the search bar (kept across the page's refreshes); ledger.q = the search being shown
+  const SORTS = [["date", "Date (oldest first)"], ["date-desc", "Date (newest first)"], ["profit", "Biggest profit first"],
+    ["loss", "Biggest loss first"], ["hero", "Hero A–Z"], ["symbol", "Symbol A–Z"]];
+  const shortHero = n => String(n || "").replace(/^Old /, "").split(" ")[0];
+  function heroNames() {
+    const names = new Set(state.bots.map(b => b.hero?.hero).filter(Boolean));
+    Object.values(ledger.cache).forEach(r => [...(r.closed || []), ...(r.buys || []), ...(r.holding || [])].forEach(x => x.hero && names.add(x.hero)));
+    return [...names].sort((a, b) => shortHero(a).localeCompare(shortHero(b)));
+  }
+  function searchBar() {
+    const days = ledgerDays();
+    if (!days.length) return "";
+    const f = ledger.form || (ledger.form = { from: days[Math.min(4, days.length - 1)], to: days[0], heroes: null, sort: "date", open: false });
+    const asc = [...days].sort();
+    const opt = sel => asc.map(d => `<option value="${d}" ${d === sel ? "selected" : ""}>${esc(dayLabel(d))}</option>`).join("");
+    const box = (v, on, label) => `<label class="hchk"><input type="checkbox" data-lshero="${esc(v)}" ${on ? "checked" : ""}> ${esc(label)}</label>`;
+    return `<details class="lsearch" ${f.open || ledger.mode === "search" ? "open" : ""}><summary>🔎 Search the ledgers</summary>
+      <div class="lsrow"><label>From <select id="lsFrom">${opt(f.from)}</select></label><label>To <select id="lsTo">${opt(f.to)}</select></label>
+        <label>Sort by <select id="lsSort">${SORTS.map(([k, t]) => `<option value="${k}" ${k === f.sort ? "selected" : ""}>${t}</option>`).join("")}</select></label></div>
+      <div class="lsrow">${box("*", !f.heroes, "All")}${heroNames().map(n => box(n, !f.heroes || f.heroes.has(n), shortHero(n))).join("")}</div>
+      <div class="lsrow"><button type="button" id="lsGo">Search</button>${ledger.mode === "search" ? `<button type="button" id="lsBack">Back to one day</button>` : ""}
+        <span class="lsmsg" id="lsMsg" role="status"></span></div></details>`;
+  }
+  function bindSearch() {
+    const b = $("ledger"), f = ledger.form;
+    if (!f || !$("lsGo")) return;
+    const det = b.querySelector(".lsearch");
+    det.addEventListener("toggle", () => { f.open = det.open; });
+    const boxes = [...b.querySelectorAll("[data-lshero]")], allBox = boxes.find(x => x.dataset.lshero === "*"), heroBoxes = boxes.filter(x => x !== allBox);
+    const keep = () => { f.heroes = allBox.checked ? null : new Set(heroBoxes.filter(h => h.checked).map(h => h.dataset.lshero)); };
+    allBox.addEventListener("change", () => { heroBoxes.forEach(x => { x.checked = allBox.checked; }); keep(); });
+    heroBoxes.forEach(x => x.addEventListener("change", () => { allBox.checked = heroBoxes.every(h => h.checked); keep(); }));
+    $("lsFrom").addEventListener("change", () => { f.from = $("lsFrom").value; });
+    $("lsTo").addEventListener("change", () => { f.to = $("lsTo").value; });
+    $("lsSort").addEventListener("change", () => { f.sort = $("lsSort").value; if (ledger.mode === "search" && ledger.q) { ledger.q.sort = f.sort; renderLedger(); } });
+    $("lsGo").addEventListener("click", () => {
+      keep();
+      if (f.heroes && !f.heroes.size) { $("lsMsg").textContent = "Tick at least one hero (or All)."; return; }
+      let from = f.from, to = f.to;
+      if (from > to) [from, to] = [to, from];
+      ledger.q = { from, to, heroes: f.heroes ? new Set(f.heroes) : null, sort: f.sort };
+      ledger.mode = "search"; renderLedger();
+    });
+    const back = $("lsBack");
+    if (back) back.addEventListener("click", () => { ledger.mode = "day"; renderLedger(); });
+  }
+  async function loadDays(list) {
+    if (ledger.bulk) return;
+    ledger.bulk = true;
+    await Promise.all(list.map(async day => {
+      if (ledger.cache[day]) return;
+      try { const r = await fetch(`reports/${day}.json?t=${Date.now()}`, { cache: "no-store" });
+        ledger.cache[day] = r.ok ? await r.json() : { day, missing: true, headline: "No report was saved for this day.", closed: [], wins: 0, losses: 0, closed_pl: 0 }; }
+      catch (_) { ledger.cache[day] = { day, missing: true, headline: "Couldn't open this day's report.", closed: [], wins: 0, losses: 0, closed_pl: 0 }; }
+    }));
+    ledger.bulk = false;
+    if (ledger.mode === "search") renderLedger();
+  }
+  const shortDay = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString([], { month: "short", day: "numeric" }); };
+  function searchResult() {
+    const q = ledger.q, t = state.today;
+    const days = ledgerDays().filter(d => d >= q.from && d <= q.to).sort();
+    const reps = days.map(d => (d === t.day ? t : ledger.cache[d]));
+    const missing = days.filter((d, i) => !reps[i]);
+    if (missing.length) return { loading: missing, days };
+    const want = h => !q.heroes || q.heroes.has(h);
+    const rows = [];
+    reps.forEach(r => ledgerRows(r).forEach(x => { if (want(x.hero)) rows.push(x); }));
+    const plv = x => (x.pl === "" || x.pl == null ? null : +x.pl);
+    const byDate = (a, b) => String(a.t).localeCompare(String(b.t));
+    const sorters = { date: byDate, "date-desc": (a, b) => byDate(b, a),
+      profit: (a, b) => ((plv(b) ?? -Infinity) - (plv(a) ?? -Infinity)) || byDate(a, b),
+      loss: (a, b) => ((plv(a) ?? Infinity) - (plv(b) ?? Infinity)) || byDate(a, b),
+      hero: (a, b) => shortHero(a.hero).localeCompare(shortHero(b.hero)) || byDate(a, b),
+      symbol: (a, b) => String(a.symbol || "").localeCompare(String(b.symbol || "")) || byDate(a, b) };
+    rows.sort(sorters[q.sort] || byDate);
+    const sells = rows.filter(r => r.side === "SELL");
+    const total = { pl: sells.reduce((a, r) => a + (+r.pl || 0), 0), wins: sells.filter(r => +r.pl > 0).length, buys: rows.filter(r => r.side === "BUY").length };
+    total.losses = sells.length - total.wins;
+    const per = {};
+    rows.forEach(r => { const h = r.hero || "?"; const p = per[h] || (per[h] = { hero: h, trades: 0, wins: 0, losses: 0, pl: 0, buys: 0 });
+      if (r.side === "BUY") p.buys++;
+      if (r.side === "SELL") { p.trades++; p.pl += +r.pl || 0; if (+r.pl > 0) p.wins++; else p.losses++; } });
+    const perList = Object.values(per).sort((a, b) => (q.sort === "loss" ? a.pl - b.pl : q.sort === "profit" ? b.pl - a.pl : shortHero(a.hero).localeCompare(shortHero(b.hero))));
+    const last = [...reps].reverse().find(r => r.has_holdings);
+    const hold = (last?.holding || []).filter(h => want(h.hero)).sort(
+      q.sort === "profit" ? (a, b) => b.pl - a.pl : q.sort === "loss" ? (a, b) => a.pl - b.pl : q.sort === "symbol" ? (a, b) => String(a.symbol).localeCompare(String(b.symbol))
+        : (a, b) => shortHero(a.hero).localeCompare(shortHero(b.hero)) || String(a.symbol).localeCompare(String(b.symbol)));
+    const heroesLabel = q.heroes ? [...q.heroes].map(shortHero).join(", ") : "All heroes";
+    const rangeLabel = days.length ? (days[0] === days[days.length - 1] ? dayLabel(days[0]) : `${dayLabel(days[0])} to ${dayLabel(days[days.length - 1])}`) : "";
+    const noReport = reps.filter(r => r.missing).map(r => r.day);
+    return { days, rows, total, perList, hold, holdDay: last?.day, heroesLabel, rangeLabel, noReport, partial: reps.some(r => r.partial_from),
+      file: `goldmire-ledger-${q.from}${q.from === q.to ? "" : "_to_" + q.to}${q.heroes ? "-" + [...q.heroes].map(shortHero).join("-") : ""}` };
+  }
+  function renderSearch(box) {
+    const res = searchResult();
+    if (res.loading) { box.innerHTML = searchBar() + `<p class="note">Opening ${res.days.length} day${res.days.length === 1 ? "" : "s"} of ledgers…</p>`; bindSearch(); loadDays(res.loading); return; }
+    const c = v => (v > 0 ? "up" : v < 0 ? "dn" : "");
+    const tot = res.total;
+    const tiles = [["Closed trades", `<span class="${c(tot.pl)}">${usd(tot.pl)}</span>`], ["Won / lost", `${tot.wins} / ${tot.losses}`], ["New buys", `${tot.buys}`], ["Days", `${res.days.length}`]];
+    const perRows = res.perList.map(p => `<tr><td>${esc(p.hero)}</td><td class="n">${p.trades}</td><td class="n">${p.wins}</td><td class="n">${p.losses}</td><td class="n ${c(p.pl)}">${p.trades ? usd(p.pl) : "–"}</td><td class="n">${p.buys}</td></tr>`).join("");
+    const perCards = `<ul class="cards">${res.perList.map(p => `<li><div class="r1"><span>${esc(shortHero(p.hero))}</span><span class="${c(p.pl)}">${p.trades ? usd(p.pl) : "–"}</span></div>
+      <div class="r2">${p.trades} closed (${p.wins} won, ${p.losses} lost) · ${p.buys} bought</div></li>`).join("")}</ul>`;
+    const side = r => r.side === "BUY" ? "Buy" : r.side === "SELL" ? "Sell" : "Gone";
+    const tr = res.rows.map(r => `<tr><td>${esc(shortDay(r.t))} ${esc(fmtT(r.t))}</td><td>${side(r)}</td><td>${esc(r.hero || "")}</td><td><b>${esc(r.symbol || "")}</b></td>
+      <td class="n">${r.paid !== "" ? px(r.paid) : ""}${r.sold !== "" ? " → " + px(r.sold) : ""}</td><td class="n">${num(r.dollars) ? "$" + num(r.dollars) : ""}</td>
+      <td class="n ${c(+r.pl)}">${r.pl === "" ? "" : usd(+r.pl)}</td><td>${esc(r.why || "")}</td></tr>`).join("");
+    const trCards = `<ul class="cards">${res.rows.map(r => `<li><div class="r1"><span>${side(r)} ${esc(r.symbol || "")}</span><span class="${c(+r.pl)}">${r.pl === "" ? (num(r.dollars) ? "$" + num(r.dollars) : "") : usd(+r.pl)}</span></div>
+      <div class="r2">${esc(shortHero(r.hero))} · ${esc(shortDay(r.t))} ${esc(fmtT(r.t))}${r.paid !== "" ? " · " + px(r.paid) : ""}${r.sold !== "" ? " → " + px(r.sold) : ""}</div>${r.why ? `<div class="r2">${esc(r.why)}</div>` : ""}</li>`).join("")}</ul>`;
+    const hold = res.hold.map(x => `<tr><td>${esc(x.hero)}</td><td><b>${esc(x.symbol)}</b></td><td class="n">${px(x.paid)}</td>
+      <td class="n">${px(x.now)}</td><td class="n ${c(x.pl)}">${usd(x.pl)}</td><td class="n ${c(x.today)}">${usd(x.today)}</td></tr>`).join("");
+    const holdCards = `<ul class="cards">${res.hold.map(x => `<li><div class="r1"><span>${esc(x.symbol)}</span><span class="${c(x.pl)}">${usd(x.pl)}</span></div>
+      <div class="r2">${esc(shortHero(x.hero))} · paid ${px(x.paid)}, now ${px(x.now)}</div></li>`).join("")}</ul>`;
+    box.innerHTML = searchBar() + `<p class="head"><b>${esc(res.rangeLabel)}</b> · ${esc(res.heroesLabel)}</p>
+      <div class="tiles">${tiles.map(([k, v]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("")}</div>
+      ${res.perList.length ? `<h3>By hero</h3><div class="tw"><table><thead><tr><th>Hero</th><th class="n">Closed</th><th class="n">Won</th><th class="n">Lost</th><th class="n">Result</th><th class="n">Bought</th></tr></thead><tbody>${perRows}</tbody></table></div>${perCards}` : ""}
+      <h3>Every trade</h3>` + (tr ? `<div class="tw"><table><thead><tr><th>When</th><th>Side</th><th>Hero</th><th>Symbol</th><th class="n">Paid → sold</th><th class="n">Amount</th><th class="n">Result</th><th>Why</th></tr></thead><tbody>${tr}</tbody></table></div>${trCards}`
+        : `<p class="note">No trades for these heroes on these days.</p>`)
+      + (res.hold.length ? `<h3>Still holding · ${esc(dayLabel(res.holdDay))}</h3><div class="tw"><table><thead><tr><th>Hero</th><th>Symbol</th><th class="n">Paid</th><th class="n">Now</th><th class="n">So far</th><th class="n">That day</th></tr></thead><tbody>${hold}</tbody></table></div>${holdCards}` : "")
+      + (res.noReport.length ? `<p class="note">No ledger was saved for ${esc(res.noReport.map(dayLabel).join(", "))}.</p>` : "")
+      + (res.partial ? `<p class="note">Some of these days started their trade journal partway through, so a few early trades may be missing.</p>` : "")
+      + `<div class="lexp"><button type="button" data-xs="csv">⬇ Spreadsheet</button><button type="button" data-xs="pdf">⬇ PDF</button>
+         <span class="note">This search, ready to hand off.</span></div>`;
+    bindSearch();
+    box.querySelectorAll("[data-xs]").forEach(b => b.addEventListener("click", () => b.dataset.xs === "csv" ? exportSearchCSV(res) : exportSearchPDF(res)));
+  }
+  function exportSearchCSV(res) {
+    const q = v => { const t = v == null ? "" : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    const line = a => a.map(q).join(",");
+    const out = [line(["Goldmire Ledger Search", res.rangeLabel]), line(["Heroes", res.heroesLabel]),
+      line(["Closed trades result ($)", num(res.total.pl), "Won", res.total.wins, "Lost", res.total.losses, "New buys", res.total.buys]),
+      "", line(["BY HERO"]), line(["Hero", "Closed", "Won", "Lost", "Result ($)", "Bought"]),
+      ...res.perList.map(p => line([p.hero, p.trades, p.wins, p.losses, num(p.pl), p.buys])),
+      "", line(["TRADES"]), line(["Date", "Time", "Side", "Hero", "Bot", "Symbol", "Price paid", "Price sold", "Amount ($)", "Result ($)", "Why"])];
+    res.rows.forEach(r => { const [d, tm] = stamp(r.t); out.push(line([d, tm, r.side, r.hero, r.bot, r.symbol, prc(r.paid), prc(r.sold), num(r.dollars), num(r.pl), r.why])); });
+    if (res.hold.length) {
+      out.push("", line(["STILL HOLDING", res.holdDay]), line(["Hero", "Bot", "Symbol", "Price paid", "Price now", "Value ($)", "Result so far ($)", "Moved that day ($)"]));
+      res.hold.forEach(h => out.push(line([h.hero, h.bot, h.symbol, prc(h.paid), prc(h.now), num(h.value), num(h.pl), num(h.today)])));
+    }
+    const blob = new Blob(["﻿" + out.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = res.file + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  function exportSearchPDF(res) {
+    let el = $("printLedger");
+    if (!el) { el = document.createElement("div"); el.id = "printLedger"; document.body.appendChild(el); }
+    const side = r => r.side === "BUY" ? "BUY" : r.side === "SELL" ? "SELL" : "GONE";
+    const rows = res.rows.map(r => { const [d, tm] = stamp(r.t); return `<tr><td>${esc(d)} ${esc(tm)}</td><td>${side(r)}</td><td>${esc(r.hero || "")}</td><td><b>${esc(r.symbol || "")}</b></td>
+      <td class="n">${prc(r.paid) ? "$" + prc(r.paid) : ""}</td><td class="n">${prc(r.sold) ? "$" + prc(r.sold) : ""}</td><td class="n">${num(r.dollars) ? "$" + num(r.dollars) : ""}</td>
+      <td class="n">${r.pl === "" ? "" : usd(+r.pl)}</td><td>${esc(r.why || "")}</td></tr>`; }).join("");
+    const per = res.perList.map(p => `<tr><td>${esc(p.hero)}</td><td class="n">${p.trades}</td><td class="n">${p.wins}</td><td class="n">${p.losses}</td><td class="n">${p.trades ? usd(p.pl) : ""}</td><td class="n">${p.buys}</td></tr>`).join("");
+    const hold = res.hold.map(h => `<tr><td>${esc(h.hero)}</td><td><b>${esc(h.symbol)}</b></td><td class="n">$${prc(h.paid)}</td><td class="n">$${prc(h.now)}</td>
+      <td class="n">${num(h.value) ? "$" + num(h.value) : ""}</td><td class="n">${usd(h.pl)}</td></tr>`).join("");
+    el.innerHTML = `<h1>Goldmire · Ledger Search</h1><p><b>${esc(res.rangeLabel)}</b> · ${esc(res.heroesLabel)}</p>
+      <p>Closed trades: ${usd(res.total.pl)} (${res.total.wins} won, ${res.total.losses} lost) · ${res.total.buys} new buys</p>
+      ${per ? `<h2>By hero</h2><table><thead><tr><th>Hero</th><th class="n">Closed</th><th class="n">Won</th><th class="n">Lost</th><th class="n">Result</th><th class="n">Bought</th></tr></thead><tbody>${per}</tbody></table>` : ""}
+      <h2>Every trade</h2>${rows ? `<table><thead><tr><th>When</th><th>Side</th><th>Hero</th><th>Symbol</th><th class="n">Paid</th><th class="n">Sold</th><th class="n">Amount</th><th class="n">Result</th><th>Why</th></tr></thead><tbody>${rows}</tbody></table>` : "<p>No trades.</p>"}
+      ${hold ? `<h2>Still holding · ${esc(dayLabel(res.holdDay))}</h2><table><thead><tr><th>Hero</th><th>Symbol</th><th class="n">Paid</th><th class="n">Now</th><th class="n">Value</th><th class="n">So far</th></tr></thead><tbody>${hold}</tbody></table>` : ""}
+      ${res.noReport.length ? `<p><i>No ledger was saved for ${esc(res.noReport.map(dayLabel).join(", "))}.</i></p>` : ""}
+      <p style="margin-top:12pt;font-size:9pt">Paper trading only. Times are this device's local time. Made ${esc(new Date().toLocaleString())}.</p>`;
+    const title = document.title;
+    document.title = res.file;     // becomes the PDF's file name
+    const done = () => { document.title = title; window.removeEventListener("afterprint", done); };
+    window.addEventListener("afterprint", done);
+    window.print();
   }
 
   // =====================================================================

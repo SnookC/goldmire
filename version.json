@@ -1,6 +1,6 @@
 {
-  "version": "1.5.6",
+  "version": "1.5.7",
   "notes": [
-    "Fix: a hero leaving crypto also cancels a coin buy order that never filled (Ysolde's WIF/USD)"
+    "Search the ledgers: pick a range of days and some or all heroes, sort by date, profit, hero or symbol, and save the result as a spreadsheet or PDF"
   ]
 }

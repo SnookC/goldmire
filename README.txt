@@ -280,6 +280,19 @@ THE DAY'S LEDGER: YOUR END-OF-DAY REPORT  -- report.py
   result and why it sold) and what's still held. Days saved before version
   1.4.2 show their sells only; buys are listed from 1.4.2 on.
 
+  SEARCH THE LEDGERS (several days, some or all heroes)
+    At the top of the ledger, open "Search the ledgers".
+    From / To   - pick the first and last day (e.g. Mon Oct 12 to Fri Oct 16
+                  for a week). Only days with a saved ledger are offered.
+    Heroes      - tick "All", or untick All and tick just the heroes you want.
+    Sort by     - optional. Date (oldest or newest first), biggest profit
+                  first, biggest loss first, hero A-Z or symbol A-Z.
+    Search      - shows the totals, a line per hero, every trade in that
+                  range and what those heroes still held on the last day.
+    The Spreadsheet / PDF buttons then save exactly that search, e.g.
+    goldmire-ledger-2026-10-12_to_2026-10-16.csv. "Back to one day" returns
+    to the day-by-day view.
+
 UPDATES (no reinstalling)
   When a new version of Goldmire is out, a gold "Update ready" button
   appears at the top of the town (on your phone too), and "Update to

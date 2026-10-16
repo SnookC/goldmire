@@ -287,6 +287,8 @@ THE DAY'S LEDGER: YOUR END-OF-DAY REPORT  -- report.py
     Heroes      - tick "All", or untick All and tick just the heroes you want.
     Sort by     - optional. Date (oldest or newest first), biggest profit
                   first, biggest loss first, hero A-Z or symbol A-Z.
+    Generate PDF - one click: runs the search with your choices and opens
+                  the PDF (pick "Save as PDF" as the printer).
     Search      - shows the totals, a line per hero, every trade in that
                   range and what those heroes still held on the last day.
     The Spreadsheet / PDF buttons then save exactly that search, e.g.

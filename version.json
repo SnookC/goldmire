@@ -1,6 +1,6 @@
 {
-  "version": "1.5.7",
+  "version": "1.5.8",
   "notes": [
-    "Search the ledgers: pick a range of days and some or all heroes, sort by date, profit, hero or symbol, and save the result as a spreadsheet or PDF"
+    "Ledger search: a Generate PDF button makes the PDF for your chosen days, heroes and sort in one click"
   ]
 }

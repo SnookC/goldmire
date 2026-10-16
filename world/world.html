@@ -986,7 +986,7 @@ footer { font-size: 12.5px; color: var(--muted); }
       <div class="lsrow"><label>From <select id="lsFrom">${opt(f.from)}</select></label><label>To <select id="lsTo">${opt(f.to)}</select></label>
         <label>Sort by <select id="lsSort">${SORTS.map(([k, t]) => `<option value="${k}" ${k === f.sort ? "selected" : ""}>${t}</option>`).join("")}</select></label></div>
       <div class="lsrow">${box("*", !f.heroes, "All")}${heroNames().map(n => box(n, !f.heroes || f.heroes.has(n), shortHero(n))).join("")}</div>
-      <div class="lsrow"><button type="button" id="lsGo">Search</button>${ledger.mode === "search" ? `<button type="button" id="lsBack">Back to one day</button>` : ""}
+      <div class="lsrow"><button type="button" id="lsGo">Search</button><button type="button" id="lsPdf">⬇ Generate PDF</button>${ledger.mode === "search" ? `<button type="button" id="lsBack">Back to one day</button>` : ""}
         <span class="lsmsg" id="lsMsg" role="status"></span></div></details>`;
   }
   function bindSearch() {
@@ -1001,14 +1001,17 @@ footer { font-size: 12.5px; color: var(--muted); }
     $("lsFrom").addEventListener("change", () => { f.from = $("lsFrom").value; });
     $("lsTo").addEventListener("change", () => { f.to = $("lsTo").value; });
     $("lsSort").addEventListener("change", () => { f.sort = $("lsSort").value; if (ledger.mode === "search" && ledger.q) { ledger.q.sort = f.sort; renderLedger(); } });
-    $("lsGo").addEventListener("click", () => {
+    const go = pdf => {
       keep();
       if (f.heroes && !f.heroes.size) { $("lsMsg").textContent = "Tick at least one hero (or All)."; return; }
       let from = f.from, to = f.to;
       if (from > to) [from, to] = [to, from];
       ledger.q = { from, to, heroes: f.heroes ? new Set(f.heroes) : null, sort: f.sort };
+      ledger.pdfWanted = pdf;          // the PDF opens as soon as those days are loaded
       ledger.mode = "search"; renderLedger();
-    });
+    };
+    $("lsGo").addEventListener("click", () => go(false));
+    $("lsPdf").addEventListener("click", () => go(true));
     const back = $("lsBack");
     if (back) back.addEventListener("click", () => { ledger.mode = "day"; renderLedger(); });
   }
@@ -1090,6 +1093,7 @@ footer { font-size: 12.5px; color: var(--muted); }
       + `<div class="lexp"><button type="button" data-xs="csv">⬇ Spreadsheet</button><button type="button" data-xs="pdf">⬇ PDF</button>
          <span class="note">This search, ready to hand off.</span></div>`;
     bindSearch();
+    if (ledger.pdfWanted) { ledger.pdfWanted = false; exportSearchPDF(res); }
     box.querySelectorAll("[data-xs]").forEach(b => b.addEventListener("click", () => b.dataset.xs === "csv" ? exportSearchCSV(res) : exportSearchPDF(res)));
   }
   function exportSearchCSV(res) {

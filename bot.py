@@ -174,10 +174,17 @@ SETTINGS_UPDATES = [
         "Crypto-1": {"kind": "stock", "strategy": "turtle_55_20", "watchlist": [], "research": True, "scan": 300, "dollars": 300},
         "Crypto-2": {"kind": "stock", "strategy": "ichimoku_cloud", "watchlist": [], "research": True, "scan": 300, "dollars": 300},
     }),
+    ("2026-10-23-two-traders", "back to the original two stock traders: Gareth and Wren get $500 pots; Old Bram and Ysolde benched (no new buys; what they hold is sold by their rules)", {
+        "Stock-1": {"dollars": 500},
+        "Stock-2": {"dollars": 500},
+        "Crypto-1": {"benched": True},
+        "Crypto-2": {"benched": True},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [
     ("2026-10-13-stocks-only", {"Stock-1": 200, "Stock-2": 200, "Crypto-1": 200, "Crypto-2": 200}),
+    ("2026-10-23-two-traders", {"Stock-1": 200, "Stock-2": 200}),
 ]
 
 

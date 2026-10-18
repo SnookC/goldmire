@@ -36,6 +36,9 @@ import updater
 import news
 import exits
 import report
+import risk
+import execution
+import validator
 
 # ---------------------------------------------------------------------------
 # SETTINGS  (bots themselves are in bots.json)
@@ -74,6 +77,8 @@ log = logging.getLogger("bot")
 STOP = threading.Event()        # set by the tray icon's "Stop Goldmire"
 RESTART = threading.Event()     # set after an update is installed: start Goldmire again
 BOTS_LIVE = []                  # the running heroes (same dicts the main loop uses)
+RECONCILED = []                 # Ysolde has done her start-up check
+LAST_OPEN = [False]             # was the market open last round (a close triggers her daily check)
 BENCH_LOCK = threading.Lock()
 BENCH_EVENTS = []               # (hero, benched) from the town's bench buttons, for the chronicle
 TRADING_LIVE = []               # the Alpaca trading client, so the town's suggestion box can check symbols
@@ -535,8 +540,10 @@ def place_buy(rnd, bot, memory, symbol, dollars, price=None):
     tif = TimeInForce.GTC if bot["kind"] == "crypto" else TimeInForce.DAY
     order, cost, how = None, dollars, f"${dollars:,.2f}"
     if bot["kind"] != "penny":
+        cid = execution.new_id(bot["name"], symbol, "buy")
         try:
-            order = rnd.trading.submit_order(MarketOrderRequest(symbol=symbol, notional=round(dollars, 2), side=OrderSide.BUY, time_in_force=tif))
+            order = execution.submit(rnd.trading, MarketOrderRequest(symbol=symbol, notional=round(dollars, 2), side=OrderSide.BUY,
+                                                                     time_in_force=tif, client_order_id=cid), cid, log.info, f"[{bot['name']}]")
         except Exception as e:
             if not price:
                 raise
@@ -546,9 +553,12 @@ def place_buy(rnd, bot, memory, symbol, dollars, price=None):
         if qty < 1:
             log.info(f"[{bot['name']}] {symbol}: ${dollars:,.2f} is not enough for one share at ${price:,.2f}")
             return False
-        order = rnd.trading.submit_order(MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY, time_in_force=tif))
+        cid = execution.new_id(bot["name"], symbol, "buy")
+        order = execution.submit(rnd.trading, MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY, time_in_force=tif,
+                                                                 client_order_id=cid), cid, log.info, f"[{bot['name']}]")
         cost, how = qty * price, f"{qty} shares at about ${price:,.2f}"
-    held_by(memory, bot)[symbol] = {"cost": round(cost, 2), "opened": datetime.now().isoformat(timespec="seconds")}
+    held_by(memory, bot)[symbol] = {"cost": round(cost, 2), "opened": datetime.now().isoformat(timespec="seconds"),
+                                    "order_id": getattr(order, "client_order_id", None) or cid}
     report.note(memory, side="buy", bot=bot["name"], symbol=symbol, dollars=round(cost, 2), price=price)
     rnd.open_orders.add(norm(symbol))
     game.record_buy(memory, bot, symbol)
@@ -569,7 +579,13 @@ def place_sell(trading, bot, memory, symbol, position=None, reason=""):
         trading.close_position(norm(symbol))
     except Exception:  # noqa: BLE001 - the cancel can take a moment to land; try once more
         time.sleep(2.0)
-        trading.close_position(norm(symbol))
+        still = None
+        try:
+            still = trading.get_open_position(norm(symbol))
+        except Exception:  # noqa: BLE001 - no position left: the first close did go through
+            log.info(f"[{bot['name']}] Ysolde: {symbol} is already closed at Alpaca: not sending the sale again")
+        if still is not None:
+            trading.close_position(norm(symbol))
     h = held_by(memory, bot).pop(symbol, None) or {}
     _book_sale(bot, memory, symbol, locked_in, reason, h, getattr(position, "avg_entry_price", None), getattr(position, "current_price", None))
 
@@ -750,6 +766,13 @@ def run_bot(bot, rnd, memory):
         if not held:
             log.info(f"[{name}] on the bench (you benched this hero): no new buys")
         return
+    stopped, verdict = validator.blocks(memory, bot)
+    if stopped:
+        log.info(f"[{name}] Bram: strategy is {verdict}: no new buys (see the start-up log, or set \"owner_approved\": true)")
+        return
+    if risk.daily_stop_hit(memory, rnd.positions, report.ny().strftime("%Y-%m-%d"), report.day_of, norm, log.info):
+        log.info(f"[{name}] Pip's daily stop is on: no new buys today")
+        return
     free_slots = bot["max_positions"] - len(held)
     if free_slots <= 0:
         return
@@ -784,6 +807,9 @@ def run_bot(bot, rnd, memory):
         log.info(f"[{name}] nothing new to look at this round")
         return
     closes = fetch_bars(candidates) if strategy is None else rnd.closes(candidates, kind)
+    team = BOTS_LIVE or [bot]
+    pots = {b["name"]: bank._acct(memory, b)["pot"] for b in team}
+    benched = {b["name"] for b in team if b.get("benched")}
     bought = 0
     for sym in candidates:
         if strategy is None:
@@ -797,12 +823,15 @@ def run_bot(bot, rnd, memory):
         mk, tf = "crypto" if kind == "crypto" else "stock", LEARNED[bot["strategy"]].timeframe if strategy is None else "15Min"
         stop = exits.stop_fraction(bot.get("stop_loss", exits.DEFAULT_STOP), c, mk, tf)
         # risk sizing measures risk by the stop, or (a technique without a stop) by how jumpy the stock is
-        risk = stop or exits.stop_fraction("smart", c, mk, tf)
-        size = bank.slot_size(memory, bot, committed, risk)
+        risk_pct = stop or exits.stop_fraction("smart", c, mk, tf)
+        size = bank.slot_size(memory, bot, committed, risk_pct)
         if size < bank.MIN_TRADE:
             break                                 # the pot is spent
-        if bot.get("sizing") == "risk" and risk:
-            log.info(f"[{name}] {sym}: {'stop' if stop else 'a typical bad move'} is {risk:.1%}, so ${size:,.2f} risks about ${size * risk:,.2f} of the pot")
+        if bot.get("sizing") == "risk" and risk_pct:
+            log.info(f"[{name}] {sym}: {'stop' if stop else 'a typical bad move'} is {risk_pct:.1%}, so ${size:,.2f} risks about ${size * risk_pct:,.2f} of the pot")
+        size = risk.cap_buy(bot, memory, rnd.positions, sym, size, pots, benched, norm, log.info)
+        if size < bank.MIN_TRADE:
+            continue                              # Pip: no room for this one
         if place_buy(rnd, bot, memory, sym, size, prices.get(sym) or (c[-1] if c else None)):
             h = held_by(memory, bot)[sym]
             h["stop"] = stop
@@ -1353,6 +1382,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
 
     memory = load_memory()
     apply_pot_topups(memory, bots)
+    validator.review(bots, memory, log.info)
     taught = {}
     for b, k, v in TRAINING:
         h = game.hero_of(b)[0]
@@ -1429,6 +1459,16 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
                 except Exception as e:
                     log.error(f"{game.RESEARCHER_SHORT[market]}: {market} research failed this time -> {e}")
                     research.mark_tried(memory, market)
+        if rnd and (not RECONCILED or (LAST_OPEN[0] and not rnd.market_open)):
+            try:                                   # Ysolde: at start-up and after each close
+                execution.reconcile(trading, memory, rnd.positions, report.ny().strftime("%Y-%m-%d"), report.day_of, norm,
+                                    rnd.market_open, log.info)
+                save_memory(memory)
+            except Exception as e:  # noqa: BLE001
+                log.error(f"Ysolde: daily check failed -> {e}")
+            RECONCILED.append(True)
+        if rnd:
+            LAST_OPEN[0] = rnd.market_open
         if rnd:
             game.MARKET_OPEN = rnd.market_open
             for bot in bots:

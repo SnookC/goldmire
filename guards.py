@@ -12,6 +12,7 @@ Alpaca sells, no waiting.
   * Before Goldmire sells for any other reason, it cancels the guard first.
   * When a guard fires, the sale is recorded like any other (ledger, chronicle, purse).
 """
+import execution
 
 GUARD_LIMIT_GAP = 0.01        # crypto stop-limit: sell no lower than 1% under the stop price
 MOVE_AT_LEAST = 0.003         # only move a guard when its price would change by 0.3% or more
@@ -44,12 +45,14 @@ def wanted_price(h, entry, stop, building, trail):
 def place(trading, symbol, qty, price, crypto, log=print):
     from alpaca.trading.requests import StopOrderRequest, StopLimitOrderRequest
     from alpaca.trading.enums import OrderSide, TimeInForce
+    cid = execution.new_id("guard", symbol, "stop")
     if crypto:
         req = StopLimitOrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL, time_in_force=TimeInForce.GTC,
-                                    stop_price=tick(price), limit_price=tick(price * (1 - GUARD_LIMIT_GAP)))
+                                    stop_price=tick(price), limit_price=tick(price * (1 - GUARD_LIMIT_GAP)), client_order_id=cid)
     else:
-        req = StopOrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL, time_in_force=TimeInForce.DAY, stop_price=tick(price))
-    return trading.submit_order(req)
+        req = StopOrderRequest(symbol=symbol, qty=qty, side=OrderSide.SELL, time_in_force=TimeInForce.DAY, stop_price=tick(price),
+                               client_order_id=cid)
+    return execution.submit(trading, req, cid, log)
 
 
 def move(trading, order, qty, price, crypto):

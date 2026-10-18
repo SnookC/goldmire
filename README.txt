@@ -189,6 +189,33 @@ STOCKS ONLY (from version 1.5.5)
   stock strategies in the Trials). Any coins they still held are sold by themselves.
   Gareth, Wren, Old Bram and Ysolde each have a $300 pot; Pip keeps $100.
 
+THE TEAM: TWO TRADERS AND THREE GUARDIANS (from version 1.5.11)
+  Gareth and Wren are the two stock traders, each with a $500 pot. Pip, Old Bram
+  and Ysolde stop trading (anything they still hold is sold by their own rules)
+  and take new jobs. Their checks are code, not suggestions:
+
+  Pip, the Risk Manager  -- risk.py   (looks at the whole account before every buy)
+    * Daily stop: if the heroes together are down $500 or more today (finished
+      trades + today's move in what they hold), nobody buys until the next day.
+    * Biggest bet: no more than 20% of a hero's pot in one stock (bigger buys shrink).
+    * Industry limit: no more than 50% of the traders' money in one industry.
+      Industries come from the SEC's free company records, saved in industries.json.
+    * Only one hero holds a stock at a time (Alpaca keeps one position per stock).
+
+  Old Bram, the Validator  -- validator.py   (judges each trader at start-up)
+    PASS / CONDITIONAL / FAIL / INSUFFICIENT EVIDENCE, from the Proving Grounds and
+    the Hero Trials. FAIL or INSUFFICIENT EVIDENCE = no new buys. CONDITIONAL may
+    trade on paper (paper trading is its next test). To overrule Bram for one hero,
+    add  "owner_approved": true  to that hero in bots.json (logged at every start).
+
+  Ysolde, the Execution Manager  -- execution.py
+    * Every order carries its own ID (gm-<hero>-<symbol>-buy-...).
+    * If sending an order fails, she asks Alpaca whether it arrived before anything
+      is sent again, so a dropped connection can't buy twice.
+    * Daily check (at start-up and after each close): positions no hero owns, and
+      any part of the account's change today the heroes' trades don't explain.
+      A gap over $25 is logged as a WARNING.
+
 SETTINGS UPDATES
   Sometimes an update also changes your heroes' settings (for example after a
   Proving Grounds report). Each change is applied once, logged in bot_log.txt and

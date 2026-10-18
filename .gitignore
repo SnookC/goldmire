@@ -13,3 +13,5 @@ __pycache__/
 proving_grounds/
 strategies/__pycache__/
 world/reports/
+industries.json
+industries.json.tmp

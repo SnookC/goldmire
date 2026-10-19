@@ -22,3 +22,5 @@ For comparison, buying and holding the same 12 stocks made +$343 over the test.
 Round 3  (written Oct 19 2026, before testing)
   7. Wren's Bollinger bounce on the 60-stock wide list (a replication, rules unchanged).
      If it PASSES there, Gareth may trade it on that fixed list of 60 stocks.
+     Result: PROMISING, not a pass (419 trades, +$527, exam +$116, beat 89% of random
+     entries; a pass needs 95%). Gareth does not get it. Gareth stays in cash.

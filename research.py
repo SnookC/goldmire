@@ -63,14 +63,23 @@ def is_leveraged_name(name):
     return bool(_ISSUER.search(name) or (_LEV.search(name) and _FUNDISH.search(name)))
 
 
+def us_equities(trading):
+    """Every US stock/fund Alpaca lists. Reads Alpaca's raw list, so a value the alpaca-py
+    library doesn't know yet (like the new Texas Stock Exchange, "TXSE", Oct 2026) can't
+    break the whole list: each asset comes back with plain-text fields."""
+    from types import SimpleNamespace
+    rows = trading.get("/assets", {"asset_class": "us_equity"})
+    return [SimpleNamespace(symbol=r.get("symbol", ""), name=r.get("name", ""), exchange=r.get("exchange", ""),
+                            status=r.get("status", ""), tradable=bool(r.get("tradable")),
+                            fractionable=bool(r.get("fractionable"))) for r in rows or []]
+
+
 def leveraged_symbols(trading, log=print):
     """Every leveraged/inverse fund Alpaca lists (one request, refreshed daily)."""
     today = datetime.now().date()
     if _lev_cache["day"] != today:
-        from alpaca.trading.requests import GetAssetsRequest
-        from alpaca.trading.enums import AssetClass
         try:
-            assets = trading.get_all_assets(GetAssetsRequest(asset_class=AssetClass.US_EQUITY))
+            assets = us_equities(trading)
             _lev_cache["symbols"] = {a.symbol for a in assets if is_leveraged_name(getattr(a, "name", ""))}
             _lev_cache["day"] = today
         except Exception as e:  # noqa: BLE001 - keep yesterday's list if the request fails
@@ -199,12 +208,10 @@ def busiest_stocks(trading, stock_data, memory, log, n=300, now=None):
     cached = rs.get("busiest") or {}
     if cached.get("day") == today and cached.get("slot") == slot and len(cached.get("list", [])) >= min(n, 50):
         return cached["list"][:n]
-    from alpaca.trading.requests import GetAssetsRequest
-    from alpaca.trading.enums import AssetClass
     from alpaca.data.requests import StockSnapshotRequest
     from alpaca.data.enums import DataFeed
     try:
-        assets = trading.get_all_assets(GetAssetsRequest(asset_class=AssetClass.US_EQUITY))
+        assets = us_equities(trading)
     except Exception as e:  # noqa: BLE001
         log(f"stock list unavailable ({e}); keeping the last busiest list")
         return cached.get("list", [])[:n]

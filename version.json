@@ -1,6 +1,6 @@
 {
-  "version": "1.5.12",
+  "version": "1.5.13",
   "notes": [
-    "Pip's industry limit now works: industries come from Nasdaq's free stock list (the SEC website turned Goldmire away)."
+    "Quill can read Alpaca's stock list again: a new exchange (the Texas Stock Exchange, TXSE) had been breaking it since Oct 19 morning."
   ]
 }

@@ -199,7 +199,7 @@ THE TEAM: TWO TRADERS AND THREE GUARDIANS (from version 1.5.11)
       trades + today's move in what they hold), nobody buys until the next day.
     * Biggest bet: no more than 20% of a hero's pot in one stock (bigger buys shrink).
     * Industry limit: no more than 50% of the traders' money in one industry.
-      Industries come from the SEC's free company records, saved in industries.json.
+      Industries come from Nasdaq's free stock list (weekly), saved in industries.json.
     * Only one hero holds a stock at a time (Alpaca keeps one position per stock).
 
   Old Bram, the Validator  -- validator.py   (judges each trader at start-up)

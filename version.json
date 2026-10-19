@@ -1,9 +1,6 @@
 {
-  "version": "1.5.11",
+  "version": "1.5.12",
   "notes": [
-    "Back to two stock traders: Gareth and Wren each get a $500 pot (topped up by $200). Old Bram, Ysolde and Pip stop trading; what they hold is sold by their own rules.",
-    "Pip becomes the Risk Manager: no new buys after a -$500 day, at most 20% of a pot in one stock, at most 50% in one industry.",
-    "Old Bram becomes the Validator: a hero whose strategy fails its tests makes no new buys.",
-    "Ysolde becomes the Execution Manager: every order has its own ID, nothing is sent twice, and a daily check compares Goldmire with Alpaca."
+    "Pip's industry limit now works: industries come from Nasdaq's free stock list (the SEC website turned Goldmire away)."
   ]
 }

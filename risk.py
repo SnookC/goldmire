@@ -14,8 +14,9 @@ you set (Oct 2026), enforced here in code, before every buy:
                    sits in one industry (everything the heroes hold counts, benched or not):
                    a buy is shrunk to fit, or skipped.
 
-Industries come from the SEC's free company records (each company's SIC code), saved in
-industries.json so each stock is looked up once. Funds (ETFs) have no SIC code, so common
+Industries come from Nasdaq's free stock screener list (every NYSE/Nasdaq/AMEX stock with
+its sector, downloaded once a week), with the SEC's company records as a backup, all saved
+in industries.json. Funds (ETFs) have no SIC code, so common
 ones are listed below. A stock whose industry can't be found counts as its own industry
 (so it never hides inside another one) and the log says so.
 
@@ -36,6 +37,12 @@ SEC_TICKERS = "https://www.sec.gov/files/company_tickers.json"
 SEC_COMPANY = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 SEC_HEADERS = {"User-Agent": "Goldmire personal paper-trading tool (github.com/SnookC/goldmire)", "Accept": "application/json"}
 TICKER_MAP_DAYS = 7
+NASDAQ_LIST = "https://api.nasdaq.com/api/screener/stocks?tableonly=true&download=true"
+NASDAQ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Goldmire", "Accept": "application/json"}
+NASDAQ_SECTORS = {"Technology": "Technology", "Energy": "Energy", "Health Care": "Healthcare", "Finance": "Finance",
+                  "Real Estate": "Real estate", "Utilities": "Utilities", "Industrials": "Industrials",
+                  "Consumer Discretionary": "Consumer", "Consumer Staples": "Consumer",
+                  "Basic Materials": "Materials", "Telecommunications": "Communication"}
 
 FUNDS = {
     "SPY": "Broad market", "VOO": "Broad market", "IVV": "Broad market", "VTI": "Broad market", "DIA": "Broad market",
@@ -89,6 +96,7 @@ def sector_for_sic(sic):
 # ---------------------------------------------------------------------------
 _cache = None
 _failed = [0.0]                 # when the SEC company list last failed to download
+_nasdaq_failed = [0.0]          # ...and Nasdaq's
 
 
 def _load():
@@ -110,8 +118,8 @@ def _save():
     os.replace(tmp, INDUSTRY_FILE)
 
 
-def _get_json(url, timeout=8):
-    req = urllib.request.Request(url, headers=SEC_HEADERS)
+def _get_json(url, timeout=8, headers=None):
+    req = urllib.request.Request(url, headers=headers or SEC_HEADERS)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read().decode("utf-8"))
 
@@ -131,11 +139,36 @@ def _cik_for(symbol, log):
     return (c.get("tickers") or {}).get(symbol.upper().replace(".", "-"))
 
 
+def _nasdaq_sector(symbol, log):
+    """Sector from Nasdaq's screener list (refreshed weekly), or None."""
+    c = _load()
+    stale = not c.get("nasdaq") or time.time() - c.get("nasdaq_at", 0) > TICKER_MAP_DAYS * 86400
+    if stale and time.time() - _nasdaq_failed[0] > 3600:
+        try:
+            rows = _get_json(NASDAQ_LIST, timeout=30, headers=NASDAQ_HEADERS)["data"]["rows"]
+            c["nasdaq"] = {r["symbol"].upper(): NASDAQ_SECTORS.get(r.get("sector") or "") for r in rows
+                           if NASDAQ_SECTORS.get(r.get("sector") or "")}
+            c["nasdaq_at"] = time.time()
+            for v in c["symbols"].values():           # earlier "not found" answers get another try
+                if not v.get("sector"):
+                    v["at"] = 0
+            _save()
+            log(f"Pip: industry list downloaded ({len(c['nasdaq'])} stocks)")
+        except Exception as e:  # noqa: BLE001
+            _nasdaq_failed[0] = time.time()
+            log(f"Pip: couldn't download Nasdaq's industry list ({e}); trying again in an hour")
+    nq = c.get("nasdaq") or {}
+    return nq.get(symbol.upper()) or nq.get(symbol.upper().replace(".", "/"))
+
+
 def industry(symbol, log=print):
     """Broad industry for a stock symbol. Unknown ones come back as 'Unknown: <SYMBOL>'."""
     sym = symbol.upper()
     if sym in FUNDS:
         return FUNDS[sym]
+    found = _nasdaq_sector(sym, log)
+    if found:
+        return found
     c = _load()
     hit = c["symbols"].get(sym)
     if hit and (hit.get("sector") or time.time() - hit.get("at", 0) < 86400):

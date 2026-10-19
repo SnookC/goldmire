@@ -18,3 +18,7 @@ Round 2  (written Oct 19 2026 before testing, tested Oct 19 on the 12-stock bask
 
 Total ideas tried for Gareth so far: 6. Passed: 0.
 For comparison, buying and holding the same 12 stocks made +$343 over the test.
+
+Round 3  (written Oct 19 2026, before testing)
+  7. Wren's Bollinger bounce on the 60-stock wide list (a replication, rules unchanged).
+     If it PASSES there, Gareth may trade it on that fixed list of 60 stocks.

@@ -1,0 +1,17 @@
+GARETH'S EXPERIMENT LOG  (every strategy idea tried for him, kept so lucky winners can't hide)
+=============================================================================================
+Each idea is written down here BEFORE it is tested. Its rules are not changed after a test.
+The more ideas are tried, the more likely one passes by luck, so this count matters.
+
+Round 1  (Oct 18 2026, tested Oct 19 on the 12-stock basket)
+  1. 12-1 momentum ............ FAILS  (+$516, but 94% of random entries did as well)
+  2. Gap-and-hold drift ....... FAILS  (only 25 trades)
+     wide retest, 60 stocks ... FAILS  (lost $30.68 in the exam, 90 trades)
+  3. Quiet breakout ........... FAILS  (80% of random entries did as well)
+
+Round 2  (written Oct 19 2026, before testing)
+  4. Turn of the month
+  5. Near the 52-week high
+  6. Dry pullback
+  Rule for round 2: an idea must PASS the standard Proving Grounds test; a pass is then
+  re-checked on the 60-stock wide list before Bram accepts it for Gareth.

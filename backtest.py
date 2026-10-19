@@ -311,7 +311,7 @@ def simulate(strategy, series, market, errors=None, cost=None):
                     entry = None
         # 3) the strategy looks at everything up to this bar's close
         lo = max(0, i + 1 - lb)
-        view = {k: series[k][lo:i + 1] for k in ("o", "h", "l", "c", "v")}
+        view = {k: series[k][lo:i + 1] for k in ("o", "h", "l", "c", "v", "t")}   # t: bar dates (calendar strategies)
         try:
             if strategy.wants_position:
                 pos = None if entry is None else {"entry": entry / (1 + cost), "bars_held": i - entry_i}

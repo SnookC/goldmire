@@ -271,6 +271,13 @@ footer { font-size: 12.5px; color: var(--muted); }
 .updpanel ul { margin: 6px 0 8px; padding-left: 20px; }
 .updpanel .small { color: var(--muted); font-size: 13px; }
 .updpanel .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.alerts { display: grid; gap: 8px; margin: 10px 0 4px; }
+.alerts:empty { display: none; }
+.alert { border: 2px solid var(--loss); background: #2a1512; color: var(--parch); border-radius: 10px; padding: 10px 14px; display: grid; gap: 2px; }
+.alert b { color: #ffb4a8; }
+.alert .when { color: var(--muted); font-size: 13px; }
+.alert.done { border-color: var(--line); background: var(--leather-2); opacity: .8; }
+.alert.done b { color: var(--muted); }
 .updpanel .acts button:first-child { background: var(--gilt); color: #2a1e08; border-color: var(--gilt-hi); font-weight: 700; }
 </style>
 
@@ -291,6 +298,7 @@ footer { font-size: 12.5px; color: var(--muted); }
     </div>
   </header>
   <div class="updpanel" id="updPanel" role="region" aria-label="Goldmire update" aria-live="polite" hidden></div>
+  <div class="alerts" id="alerts" role="region" aria-label="Watchdog alerts" aria-live="polite"></div>
 
   <div class="stage">
     <canvas id="town" width="1024" height="640" aria-label="A storybook town seen from above. Townsfolk go about their day; the heroes are your trading bots."></canvas>
@@ -589,8 +597,16 @@ footer { font-size: 12.5px; color: var(--muted); }
     return `<div class="watch">${wl.map(s => `<span class="${added.has(s) ? "new" : ""}" title="${esc((b.reasons || {})[s] || "")}">${esc(s)}</span>`).join("")}</div>`;
   }
   function researchOf(m) { const r = state.research || {}; if (r.last_run && !r.stock && !r.crypto) return m === "stock" ? r : null; return r[m] || null; }   // old one-researcher files too
+  function renderAlerts() {
+    const box = $("alerts"); if (!box) return;
+    const t = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }); };
+    box.innerHTML = (state.alerts || []).map(a => a.resolved
+      ? `<div class="alert done"><b>Resolved · ${esc(a.message)}</b><span class="when">${esc(a.count)} times, last ${esc(t(a.last))}; quiet since ${esc(t(a.resolved))}</span></div>`
+      : `<div class="alert"><b>Watchdog · ${esc(a.message)}</b><span class="when">${esc(a.count)} times since ${esc(t(a.first))}, latest ${esc(t(a.last))}</span><span class="when">${esc(a.example || "")}</span></div>`).join("");
+  }
   function render() {
     const g = state.game; if (!g) return;
+    renderAlerts();
     $("era").textContent = `${STAGES[stageOf()].replace(/^a/, "A")} · ${eraName()}`; $("gtitle").textContent = g.guild.title;
     // profit by area: today (sales today + how holdings moved today) or all time (closed and open)
     const span = store.get("goldmire.span") === "all" ? "all" : "today";
@@ -848,7 +864,7 @@ footer { font-size: 12.5px; color: var(--muted); }
     state.live = true;
     state.bots = s.bots.map(b => ({ ...b, pl: +b.pl || 0, positions: b.positions || [],
       added: first ? [] : (b.watchlist || []).filter(x => !(oldLists[b.name] || []).includes(x)) }));
-    state.total = +s.total_pl || 0; state.budget = +s.budget || 500; state.marketOpen = !!s.market_open; state.updated = s.updated; state.game = s.game; state.research = s.research || null; state.news = s.news || null; state.today = s.today || null;
+    state.total = +s.total_pl || 0; state.budget = +s.budget || 500; state.marketOpen = !!s.market_open; state.updated = s.updated; state.game = s.game; state.research = s.research || null; state.news = s.news || null; state.today = s.today || null; state.alerts = s.alerts || [];
     if (first) town.rebase();
     else ["stock", "crypto"].forEach(m => { const lr = researchOf(m)?.last_run; if (lr && lr !== lastResearch[m]) town.researchDone(m); });
   }

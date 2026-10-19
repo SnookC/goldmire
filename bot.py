@@ -39,6 +39,7 @@ import report
 import risk
 import execution
 import validator
+import watchdog
 
 # ---------------------------------------------------------------------------
 # SETTINGS  (bots themselves are in bots.json)
@@ -944,6 +945,9 @@ def update_world(trading, memory, market_open, bots):
         status["today"]["archive"] = report.index_days()
     except Exception as e:  # noqa: BLE001 - the ledger is a bonus; never stop the heroes over it
         log.error(f"Day's Ledger: couldn't build today's report -> {e}")
+    if watchdog.DOG:
+        watchdog.DOG.tidy()
+        status["alerts"] = watchdog.DOG.active()
     save_memory(memory)
     write_status(status)
     log.info(f"World: total bot profit/loss ${status['total_pl']:+.2f}")
@@ -1380,6 +1384,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     screener = ScreenerClient(key, secret)
     news_client = NewsClient(key, secret)
 
+    watchdog.start(WORLD_DIR)                  # alerts in the town when a problem keeps repeating
     memory = load_memory()
     apply_pot_topups(memory, bots)
     validator.review(bots, memory, log.info)

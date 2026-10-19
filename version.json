@@ -1,6 +1,6 @@
 {
-  "version": "1.5.13",
+  "version": "1.5.14",
   "notes": [
-    "Quill can read Alpaca's stock list again: a new exchange (the Texas Stock Exchange, TXSE) had been breaking it since Oct 19 morning."
+    "New: the Watchdog. When a problem keeps repeating (Alpaca unreachable, Quill's stock list failing, a hero erroring, Pip's industry list down) a red alert appears at the top of the town, on your PC and phone. It clears itself once the problem stops."
   ]
 }

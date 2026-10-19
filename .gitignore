@@ -15,3 +15,5 @@ strategies/__pycache__/
 world/reports/
 industries.json
 industries.json.tmp
+world/alerts.json
+world/alerts.json.tmp

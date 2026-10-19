@@ -216,6 +216,13 @@ THE TEAM: TWO TRADERS AND THREE GUARDIANS (from version 1.5.11)
       any part of the account's change today the heroes' trades don't explain.
       A gap over $25 is logged as a WARNING.
 
+THE WATCHDOG: ALERTS WHEN SOMETHING KEEPS GOING WRONG (from version 1.5.14)  -- watchdog.py
+  The Watchdog reads Goldmire's log. When the same problem repeats (3 times within
+  an hour for most; at once for Pip's daily stop or money Ysolde can't explain), a
+  red alert appears at the top of the town page, on your PC and your phone, and in
+  bot_log.txt as "Watchdog: ALERT". After 2 quiet hours it turns grey ("Resolved")
+  and then disappears. It only reports: fixes come as tested updates.
+
 SETTINGS UPDATES
   Sometimes an update also changes your heroes' settings (for example after a
   Proving Grounds report). Each change is applied once, logged in bot_log.txt and

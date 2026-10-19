@@ -55,6 +55,21 @@ BASKET = {
     "stock": ["SPY", "QQQ", "AAPL", "MSFT", "NVDA", "AMD", "AMZN", "JPM", "XOM", "TSLA", "KO", "PLTR"],
     "crypto": ["BTC/USD", "ETH/USD", "SOL/USD", "DOGE/USD", "XRP/USD", "AVAX/USD", "LTC/USD", "LINK/USD"],
 }
+# A wider list for a second look (python backtest.py <name> --wide): 60 big, busy US stocks across
+# every industry, fixed in advance (Oct 19 2026) and never picked by how a strategy did on them.
+# Like the main basket it's today's big companies, so it still flatters results a little
+# (companies that shrank or vanished are missing).
+WIDE_BASKET = [
+    "AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "CRM", "ADBE", "CSCO", "INTC", "QCOM", "TXN", "IBM",
+    "GOOGL", "META", "NFLX", "DIS", "T", "VZ",
+    "AMZN", "TSLA", "HD", "MCD", "NKE", "SBUX", "COST", "WMT", "PG", "KO", "PEP",
+    "UNH", "JNJ", "LLY", "PFE", "MRK", "ABBV", "TMO",
+    "JPM", "BAC", "WFC", "GS", "MS", "C", "V", "MA", "AXP",
+    "XOM", "CVX", "COP", "SLB",
+    "CAT", "BA", "GE", "HON", "UPS", "DE", "LMT",
+    "NEE", "DUK", "LIN", "AMT",
+]
+OUT_SUFFIX = ""            # "_wide" for a --wide run (its own results file, so the main report stays as it is)
 HISTORY_DAYS = {"15Min": 180, "1Hour": 365, "1Day": 365 * 4}
 COST = {"stock": 0.0005, "crypto": 0.0025, "penny": 0.002}     # per side: fees + slippage (penny spreads are wide)
 PENNY_BASKET_SIZE = 25
@@ -459,9 +474,11 @@ def run(only=None, log=print, fetch=fetch_history):
     os.makedirs(OUT_DIR, exist_ok=True)
     report = {"run": datetime.now().isoformat(timespec="seconds"), "trade_dollars": TRADE_DOLLARS,
               "exam_share": EXAM_SHARE, "costs": COST, "results": results}
-    with open(os.path.join(OUT_DIR, "results.json"), "w", encoding="utf-8") as f:
+    if OUT_SUFFIX:
+        report["basket"] = "wide"
+    with open(os.path.join(OUT_DIR, f"results{OUT_SUFFIX}.json"), "w", encoding="utf-8") as f:
         json.dump(report, f, indent=1)
-    with open(os.path.join(OUT_DIR, "report.html"), "w", encoding="utf-8") as f:
+    with open(os.path.join(OUT_DIR, f"report{OUT_SUFFIX}.html"), "w", encoding="utf-8") as f:
         f.write(render_html(report))
     return report
 
@@ -522,13 +539,20 @@ were pennies back then but aren't today are missing from it.</p></body></html>""
 
 def main():
     only = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else None
+    global OUT_SUFFIX
+    fetch = fetch_history
+    if "--wide" in sys.argv:
+        OUT_SUFFIX = "_wide"
+        fetch = lambda market, tf, log=print: fetch_history(market, tf, log, symbols=WIDE_BASKET if market == "stock" else None,
+                                                            tag="wide" if market == "stock" else "")  # noqa: E731
+        print(f"Wide test: {len(WIDE_BASKET)} stocks instead of {len(BASKET['stock'])}.")
     print("The Proving Grounds: testing every strategy on real price history. This takes a few minutes.\n")
-    report = run(only)
+    report = run(only, fetch=fetch)
     print()
     for r in report["results"]:
         if not r["builtin"]:
             print(f"{r['verdict']:9}  {r['name']} [{r['market']}]  {_money(r['pl'])}, exam {_money(r['exam_pl'])}: {r['why']}")
-    path = os.path.join(OUT_DIR, "report.html")
+    path = os.path.join(OUT_DIR, f"report{OUT_SUFFIX}.html")
     print(f"\nFull report: {path}")
     if "--no-open" not in sys.argv:
         webbrowser.open("file:///" + path.replace("\\", "/"))

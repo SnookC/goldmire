@@ -9,9 +9,12 @@ Round 1  (Oct 18 2026, tested Oct 19 on the 12-stock basket)
      wide retest, 60 stocks ... FAILS  (lost $30.68 in the exam, 90 trades)
   3. Quiet breakout ........... FAILS  (80% of random entries did as well)
 
-Round 2  (written Oct 19 2026, before testing)
-  4. Turn of the month
-  5. Near the 52-week high
-  6. Dry pullback
+Round 2  (written Oct 19 2026 before testing, tested Oct 19 on the 12-stock basket)
+  4. Turn of the month ....... FAILS  (552 trades, +$118, but 95% of random entries did as well)
+  5. Near the 52-week high ... FAILS  (+$309, but 92% of random entries did as well)
+  6. Dry pullback ............ FAILS  (+$36, 86% of random entries did as well)
   Rule for round 2: an idea must PASS the standard Proving Grounds test; a pass is then
   re-checked on the 60-stock wide list before Bram accepts it for Gareth.
+
+Total ideas tried for Gareth so far: 6. Passed: 0.
+For comparison, buying and holding the same 12 stocks made +$343 over the test.

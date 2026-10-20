@@ -776,7 +776,11 @@ def run_bot(bot, rnd, memory):
         return
     stopped, verdict = validator.blocks(memory, bot)
     if stopped:
-        log.info(f"[{name}] Bram: strategy is {verdict}: no new buys (see the start-up log, or set \"owner_approved\": true)")
+        said = memory.setdefault("bram_said", {})
+        today = report.ny().strftime("%Y-%m-%d")
+        if said.get(name) != today:            # once a day is enough
+            said[name] = today
+            log.info(f"[{name}] Bram: strategy is {verdict}: no new buys today (see the start-up log, or set \"owner_approved\": true)")
         return
     if risk.daily_stop_hit(memory, rnd.positions, report.ny().strftime("%Y-%m-%d"), report.day_of, norm, log.info):
         log.info(f"[{name}] Pip's daily stop is on: no new buys today")

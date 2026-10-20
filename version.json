@@ -1,6 +1,6 @@
 {
-  "version": "1.5.15",
+  "version": "1.5.16",
   "notes": [
-    "The town shows the new team: Gareth and Wren under Heroes of the Guild, and Pip, Old Bram and Ysolde in a new Guardians section with what each one is watching (today vs the daily stop, money per industry, each trader's grade, and Ysolde's daily Alpaca check). Guardians no longer have a Send back to work button."
+    "Quieter log: Old Bram now notes a blocked trader once a day instead of every 5 minutes."
   ]
 }

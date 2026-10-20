@@ -271,6 +271,18 @@ footer { font-size: 12.5px; color: var(--muted); }
 .updpanel ul { margin: 6px 0 8px; padding-left: 20px; }
 .updpanel .small { color: var(--muted); font-size: 13px; }
 .updpanel .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.gcard .role { font-size: 13px; color: var(--parch); line-height: 1.4; }
+.gcard .glist { display: grid; gap: 4px; font-size: 13px; }
+.gcard .glist div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--line); padding-bottom: 3px; }
+.gcard .glist div span:first-child { color: var(--muted); }
+.gcard .gbar { height: 6px; border-radius: 3px; background: #0b100c; overflow: hidden; }
+.gcard .gbar i { display: block; height: 100%; background: var(--gilt); }
+.gcard .gbar.hot i { background: var(--loss); }
+.verdict { font-weight: 700; padding: 0 6px; border-radius: 6px; border: 1px solid var(--line); }
+.verdict.ok { color: var(--gain); border-color: var(--gain); }
+.verdict.mid { color: var(--gilt-hi); border-color: var(--gilt); }
+.verdict.bad { color: var(--loss); border-color: var(--loss); }
+.card .note { font-size: 12.5px; color: var(--loss); }
 .alerts { display: grid; gap: 8px; margin: 10px 0 4px; }
 .alerts:empty { display: none; }
 .alert { border: 2px solid var(--loss); background: #2a1512; color: var(--parch); border-radius: 10px; padding: 10px 14px; display: grid; gap: 2px; }
@@ -318,6 +330,11 @@ footer { font-size: 12.5px; color: var(--muted); }
   <section>
     <h2>Heroes of the Guild</h2>
     <div class="heroes" id="heroes"></div>
+  </section>
+
+  <section id="guardSec" hidden>
+    <h2>The Guardians</h2>
+    <div class="heroes" id="guardians"></div>
   </section>
 
   <section>
@@ -584,8 +601,8 @@ footer { font-size: 12.5px; color: var(--muted); }
       <div class="bar"><i style="width:${clamp(k.pot / k.limit * 100, 0, 100)}%"></i></div>
       <div class="l"><span>Vault</span><b class="num">${money(k.savings)}</b></div><div class="sub">${sub}</div></div>`;
   }
-  function holdsHtml(b) {
-    const ps = b.positions || [], free = Math.max(0, (b.max_positions || 1) - ps.length);
+  function holdsHtml(b, noFree) {
+    const ps = b.positions || [], free = noFree ? 0 : Math.max(0, (b.max_positions || 1) - ps.length);
     return `<div class="holds">${ps.map(p => p.pending ? `<span class="wait"><b>${esc(p.symbol)}</b>buying…</span>`
         : `<span><b>${esc(p.symbol)}</b><em class="num ${cls(p.pl)}" style="font-style:normal">${usd(p.pl)}</em></span>`).join("")}${
       free > 3 ? `<span class="free">${free} free slots</span>` : Array.from({ length: free }, () => `<span class="free">free slot</span>`).join("")}</div>`;
@@ -595,6 +612,55 @@ footer { font-size: 12.5px; color: var(--muted); }
     if (b.scan) return `<div class="watch"><span>${b.kind === "crypto" ? `Watching all ${b.scanning || ""} coins` : `Scanning the ${b.scanning || b.scan} busiest stocks`}</span></div>`;
     const wl = b.watchlist || [], added = new Set(b.added || []);
     return `<div class="watch">${wl.map(s => `<span class="${added.has(s) ? "new" : ""}" title="${esc((b.reasons || {})[s] || "")}">${esc(s)}</span>`).join("")}</div>`;
+  }
+  const VERDICT = { "PASS": "ok", "CONDITIONAL": "mid", "FAIL": "bad", "INSUFFICIENT EVIDENCE": "bad" };
+  function verdictNote(b) {
+    if (b.role || b.benched || !b.verdict || VERDICT[b.verdict] !== "bad") return "";
+    return `<div class="note">Old Bram: strategy ${esc(b.verdict)}, so no new buys until a strategy passes its tests</div>`;
+  }
+  const ROLE = {
+    risk: ["Risk Manager", "Looks at the whole account before every buy: the daily stop, the biggest bet, and how much sits in one industry."],
+    validator: ["Validator", "Grades each trader's strategy from the Proving Grounds and Hero Trials. A failing strategy makes no new buys."],
+    execution: ["Execution Manager", "Gives every order its own ID so nothing is sent twice, and checks Goldmire's records against Alpaca every day."],
+  };
+  function guardianBody(b) {
+    const G = state.guardians || {};
+    if (b.role === "risk" && G.risk) {
+      const r = G.risk, used = clamp(-r.day_pl / r.daily_stop * 100, 0, 100);
+      const ind = (r.industries || []).map(x => { const hot = r.industry_limit && x.value > r.industry_limit * 0.8;
+        return `<div><span>${esc(String(x.name).replace(/^Unknown: /, "Unsorted: "))}</span><b class="num ${hot ? "loss" : ""}">${money(x.value)}</b></div>`; }).join("");
+      return `<div class="glist"><div><span>Today, all traders</span><b class="num ${cls(r.day_pl)}">${usd(r.day_pl)}</b></div></div>
+        <div class="gbar${r.stopped ? " hot" : ""}" title="How close today is to the daily stop"><i style="width:${used}%"></i></div>
+        <div class="sub" style="font-size:12.5px;color:var(--muted)">${r.stopped ? "<b class='loss'>Daily stop is ON: no buys until tomorrow</b>" : `Daily stop at ${money(-r.daily_stop)} · one stock max ${Math.round(r.stock_share * 100)}% of a pot`}</div>
+        <div class="glist">${ind}<div><span>Limit per industry</span><b class="num">${money(r.industry_limit)}</b></div></div>`;
+    }
+    if (b.role === "validator" && G.validator) {
+      return `<div class="glist">${G.validator.map(v => `<div><span>${esc(v.hero)}</span><span class="verdict ${VERDICT[v.verdict] || "mid"}">${esc(v.verdict)}${v.approved ? " · approved by you" : ""}</span></div>`).join("") || "<div><span>No traders at work</span></div>"}</div>`;
+    }
+    if (b.role === "execution" && G.execution) {
+      const e = G.execution, un = e.unexplained;
+      const when = (() => { const d = new Date(e.checked); return isNaN(d) ? e.day : d.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }); })();
+      return `<div class="glist"><div><span>Last check</span><b>${esc(when)}</b></div>
+        <div><span>Whole account</span><b class="num ${cls(e.account_change)}">${e.account_change == null ? "?" : usd(e.account_change)}</b></div>
+        <div><span>Explained by the heroes</span><b class="num ${cls(e.heroes)}">${usd(e.heroes)}</b></div>
+        <div><span>Unexplained</span><b class="num ${un != null && Math.abs(un) > 25 ? "loss" : ""}">${un == null ? "?" : usd(un)}</b></div>
+        ${(e.orphans || []).length ? `<div><span>Not owned by a hero</span><b>${esc(e.orphans.join(", "))}</b></div>` : ""}</div>`;
+    }
+    return `<div class="sub" style="font-size:12.5px;color:var(--muted)">Waiting for the next report from Goldmire.</div>`;
+  }
+  function renderGuardians() {
+    const gs = state.bots.map((b, i) => [b, i]).filter(([b]) => b.role);
+    $("guardSec").hidden = !gs.length;
+    $("guardians").innerHTML = gs.map(([b, i]) => {
+      const h = b.hero || heroBlock(b), [title, what] = ROLE[b.role] || ["Guardian", ""], n = (b.positions || []).length;
+      return `<article class="card gcard"><span class="lv">Lv ${h.level}</span>
+        <div class="top"><div class="emblem"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[h.cls] || ICONS.Knight}</svg></div>
+          <div class="who"><div class="n">${esc(h.hero)}</div><div class="c">${esc(title)}</div></div></div>
+        <div class="role">${esc(what)}</div>
+        ${guardianBody(b)}
+        ${n ? `<div class="state">Finishing ${n} old trade${n > 1 ? "s" : ""} from trading days (sold by their old rules, no new ones): <span class="num ${cls(b.pl)}">${usd(b.pl)}</span> all time</div>${holdsHtml(b, true)}` : `<div class="state">Old trading record: <span class="num ${cls(b.pl)}">${usd(b.pl)}</span> (W${h.wins} · L${h.losses})</div>`}
+        <div class="acts"><button class="find" type="button" data-hero="${i}">Find in town</button></div></article>`;
+    }).join("");
   }
   function researchOf(m) { const r = state.research || {}; if (r.last_run && !r.stock && !r.crypto) return m === "stock" ? r : null; return r[m] || null; }   // old one-researcher files too
   function renderAlerts() {
@@ -633,7 +699,7 @@ footer { font-size: 12.5px; color: var(--muted); }
     const gl = g.guild.level, lo = gl > 1 ? needFor(gl - 1) : 0, hi = needFor(gl);
     $("gbar").style.width = clamp((g.guild.xp - lo) / (hi - lo) * 100, 0, 100) + "%";
     $("glevel").textContent = "Guild level " + gl; $("gxp").textContent = `${g.guild.xp.toLocaleString()} / ${hi.toLocaleString()} XP`;
-    $("heroes").innerHTML = state.bots.map((b, i) => {
+    $("heroes").innerHTML = state.bots.map((b, i) => [b, i]).filter(([b]) => !b.role).map(([b, i]) => {
       const h = b.hero || heroBlock(b), lo2 = h.level > 1 ? needFor(h.level - 1) : 0, hi2 = needFor(h.level);
       const streak = h.streak >= 2 ? ` · ${h.streak}-win streak` : h.streak <= -2 ? ` · ${-h.streak}-loss slump` : "";
       return `<article class="card${b.positions?.length ? " quest" : ""}${b.benched ? " benched" : ""}"><span class="lv">Lv ${h.level}</span>
@@ -642,10 +708,11 @@ footer { font-size: 12.5px; color: var(--muted); }
         <div class="bar" title="${h.xp} XP"><i style="width:${clamp((h.xp - lo2) / (hi2 - lo2) * 100, 0, 100)}%"></i></div>
         <div class="stats"><span class="gold num ${cls(b.pl)}">${sgold(b.pl)}</span><span class="rec num">W${h.wins} · L${h.losses}${streak}</span></div>
         ${holdsHtml(b)}${purseHtml(b.bank)}
-        <div class="state">${stateLine(b)}</div>
+        <div class="state">${stateLine(b)}</div>${verdictNote(b)}
         <div class="acts"><button class="find" type="button" data-hero="${i}">Find in town</button>${state.live ? `<button class="bench${b.benched ? " on" : ""}" type="button" data-bench="${i}"
           title="${b.benched ? "Let this hero start new trades again" : "Stop new buys for this hero. What they hold is still sold by their normal rules."}">${b.benched ? "Send back to work" : "Bench"}</button>` : ""}</div></article>`;
     }).join("");
+    renderGuardians();
     // researchers' board: one panel per researcher, with the heroes they serve
     const leadCard = b => {
       const h = b.hero || heroBlock(b), added = new Set(b.added || []);
@@ -753,6 +820,7 @@ footer { font-size: 12.5px; color: var(--muted); }
     } catch (_) { toast("Couldn't reach Goldmire", "Is the PC on and Goldmire running?", true); bb.disabled = false; }
   });
   $("heroes").addEventListener("click", e => { const btn = e.target.closest("[data-hero]"); if (btn) { town.findHero(+btn.dataset.hero); $("town").scrollIntoView({ behavior: "smooth", block: "center" }); } });
+  $("guardians").addEventListener("click", e => { const btn = e.target.closest("[data-hero]"); if (btn) { town.findHero(+btn.dataset.hero); $("town").scrollIntoView({ behavior: "smooth", block: "center" }); } });
 
   // =====================================================================
   // DEMO
@@ -864,7 +932,7 @@ footer { font-size: 12.5px; color: var(--muted); }
     state.live = true;
     state.bots = s.bots.map(b => ({ ...b, pl: +b.pl || 0, positions: b.positions || [],
       added: first ? [] : (b.watchlist || []).filter(x => !(oldLists[b.name] || []).includes(x)) }));
-    state.total = +s.total_pl || 0; state.budget = +s.budget || 500; state.marketOpen = !!s.market_open; state.updated = s.updated; state.game = s.game; state.research = s.research || null; state.news = s.news || null; state.today = s.today || null; state.alerts = s.alerts || [];
+    state.total = +s.total_pl || 0; state.budget = +s.budget || 500; state.marketOpen = !!s.market_open; state.updated = s.updated; state.game = s.game; state.research = s.research || null; state.news = s.news || null; state.today = s.today || null; state.alerts = s.alerts || []; state.guardians = s.guardians || null;
     if (first) town.rebase();
     else ["stock", "crypto"].forEach(m => { const lr = researchOf(m)?.last_run; if (lr && lr !== lastResearch[m]) town.researchDone(m); });
   }

@@ -1,6 +1,6 @@
 {
-  "version": "1.5.14",
+  "version": "1.5.15",
   "notes": [
-    "New: the Watchdog. When a problem keeps repeating (Alpaca unreachable, Quill's stock list failing, a hero erroring, Pip's industry list down) a red alert appears at the top of the town, on your PC and phone. It clears itself once the problem stops."
+    "The town shows the new team: Gareth and Wren under Heroes of the Guild, and Pip, Old Bram and Ysolde in a new Guardians section with what each one is watching (today vs the daily stop, money per industry, each trader's grade, and Ysolde's daily Alpaca check). Guardians no longer have a Send back to work button."
   ]
 }

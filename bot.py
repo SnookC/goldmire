@@ -186,6 +186,11 @@ SETTINGS_UPDATES = [
         "Crypto-1": {"benched": True},
         "Crypto-2": {"benched": True},
     }),
+    ("2026-10-19-guardian-roles", "Pip, Old Bram and Ysolde take their guardian jobs (risk, validation, execution)", {
+        "Penny": {"role": "risk"},
+        "Crypto-1": {"role": "validator"},
+        "Crypto-2": {"role": "execution"},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [
@@ -763,6 +768,8 @@ def run_bot(bot, rnd, memory):
                 save_memory(memory)
 
     # 3) Look for new buys if there are free slots (not while you've benched this hero)
+    if bot.get("role"):                      # a guardian: only finishes the trades it already had
+        return
     if bot.get("benched"):
         if not held:
             log.info(f"[{name}] on the bench (you benched this hero): no new buys")
@@ -889,6 +896,7 @@ def build_status(positions, memory, market_open, bots):
         unrealized = round(sum(p["pl"] for p in pos_list), 2)
         out.append({
             "name": b["name"], "kind": b["kind"], "strategy": b["strategy"], "benched": bool(b.get("benched")),
+            "role": b.get("role"), "verdict": memory.get("validation", {}).get(b["name"], {}).get("verdict"),
             "strategy_name": STRATEGY_NAMES[b["strategy"]], "watchlist": [] if research.scan_size(b) else wl,
             "scan": research.scan_size(b), "scanning": len(wl) if research.scan_size(b) else 0,
             "pinned": list(b.get("pinned", [])),
@@ -916,6 +924,36 @@ def build_status(positions, memory, market_open, bots):
                  "alarms": [{"symbol": a["symbol"], "headline": a["headline"], "time": a["time"]}
                             for a in memory.get("news", {}).get("alarms", {}).values()]},
         "bots": out,
+    }
+
+
+def guardians_status(memory, positions, bots):
+    """What Pip, Old Bram and Ysolde are watching right now, for their cards in the town."""
+    today = report.ny().strftime("%Y-%m-%d")
+    total, closed, open_today = risk.heroes_day_pl(memory, positions, today, report.day_of, norm)
+    working = [b for b in bots if not b.get("benched") and not b.get("role")]
+    combined = sum(bank._acct(memory, b)["pot"] for b in working)
+    by_ind = {}
+    for hero, held in memory.get("held", {}).items():
+        for s, h in held.items():
+            if "/" in s:
+                continue
+            p = positions.get(norm(s))
+            v = float(getattr(p, "market_value", 0) or 0) if p else float(h.get("cost") or 0)
+            ind = risk.industry(norm(s), lambda *_: None)
+            by_ind[ind] = by_ind.get(ind, 0.0) + v
+    top = sorted(by_ind.items(), key=lambda kv: -kv[1])[:4]
+    rec = memory.get("reconcile", {})
+    last = rec.get(today) or (rec[max(rec)] if rec else None)
+    return {
+        "risk": {"day_pl": total, "day_closed": closed, "day_open": open_today, "daily_stop": risk.DAILY_STOP_DOLLARS,
+                 "stopped": total <= -risk.DAILY_STOP_DOLLARS, "stock_share": risk.MAX_STOCK_SHARE,
+                 "industry_share": risk.MAX_INDUSTRY_SHARE, "industry_limit": round(combined * risk.MAX_INDUSTRY_SHARE, 2),
+                 "industries": [{"name": k, "value": round(v, 2)} for k, v in top]},
+        "validator": [{"name": b["name"], "hero": b.get("hero", b["name"]),
+                       "verdict": memory.get("validation", {}).get(b["name"], {}).get("verdict") or "not judged yet",
+                       "approved": bool(b.get("owner_approved"))} for b in working],
+        "execution": last,
     }
 
 
@@ -948,6 +986,10 @@ def update_world(trading, memory, market_open, bots):
     if watchdog.DOG:
         watchdog.DOG.tidy()
         status["alerts"] = watchdog.DOG.active()
+    try:
+        status["guardians"] = guardians_status(memory, positions, bots)
+    except Exception as e:  # noqa: BLE001 - a bonus panel; never stop the heroes over it
+        log.error(f"World: couldn't build the guardians' panel -> {e}")
     save_memory(memory)
     write_status(status)
     log.info(f"World: total bot profit/loss ${status['total_pl']:+.2f}")

@@ -190,6 +190,9 @@ STOCKS ONLY (from version 1.5.5)
   Gareth, Wren, Old Bram and Ysolde each have a $300 pot; Pip keeps $100.
 
 THE TEAM: TWO TRADERS AND THREE GUARDIANS (from version 1.5.11)
+  In the town (from 1.5.15) the traders are under Heroes of the Guild and the
+  guardians have their own section, The Guardians, showing what each one watches.
+  A guardian ("role" in bots.json) never opens new trades, only finishes old ones.
   Gareth and Wren are the two stock traders, each with a $500 pot. Pip, Old Bram
   and Ysolde stop trading (anything they still hold is sold by their own rules)
   and take new jobs. Their checks are code, not suggestions:

@@ -24,3 +24,10 @@ Round 3  (written Oct 19 2026, before testing)
      If it PASSES there, Gareth may trade it on that fixed list of 60 stocks.
      Result: PROMISING, not a pass (419 trades, +$527, exam +$116, beat 89% of random
      entries; a pass needs 95%). Gareth does not get it. Gareth stays in cash.
+
+Round 4  (written Oct 20 2026, before testing): the MARKET WEATHER check
+  New: strategies can see the S&P 500 (SPY) and only buy in FAIR weather (SPY above its
+  200-day average and not unusually jumpy). See _weather.py.
+  8. Bollinger bounce (fair weather), for Wren. To replace her plain version it must PASS,
+     pass again on the 60-stock list, AND beat plain Bollinger bounce on both.
+  9. 12-1 momentum (fair weather), for Gareth. Must PASS, then pass on the 60-stock list.

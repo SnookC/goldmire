@@ -226,6 +226,20 @@ THE WATCHDOG: ALERTS WHEN SOMETHING KEEPS GOING WRONG (from version 1.5.14)  -- 
   bot_log.txt as "Watchdog: ALERT". After 2 quiet hours it turns grey ("Resolved")
   and then disappears. It only reports: fixes come as tested updates.
 
+THE SCORECARD, THE MARKET WEATHER AND THE CALENDAR (from version 1.5.17)
+  The Scorecard (scorecard.py), in the town: for each trader, since its current
+    strategy started: what its pot made, what the same money made in the S&P 500,
+    and its live win rate and average per trade next to what the Proving Grounds
+    measured. TOO EARLY under 20 finished trades; BEHIND (and a Watchdog alert) if
+    it wins 15+ points less often than its test, or loses on average where the
+    test made money. BEHIND doesn't stop a trader by itself: that's your call.
+  Market weather (strategies/_weather.py), on Pip's card: FAIR (S&P 500 above its
+    200-day average, not unusually jumpy), WINDY (jumpy) or STORMY (below it).
+    Strategies with NEEDS_MARKET = True can use it; they are tested like any other.
+  The Calendar (calendar_desk.py), in the town and on each held stock: earnings in
+    the next 7 weekdays and the big US economic releases, from Nasdaq's free
+    calendars, refreshed daily. Shown for you; the heroes still hold through earnings.
+
 SETTINGS UPDATES
   Sometimes an update also changes your heroes' settings (for example after a
   Proving Grounds report). Each change is applied once, logged in bot_log.txt and

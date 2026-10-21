@@ -40,6 +40,8 @@ import risk
 import execution
 import validator
 import watchdog
+import calendar_desk
+import scorecard
 
 # ---------------------------------------------------------------------------
 # SETTINGS  (bots themselves are in bots.json)
@@ -79,6 +81,7 @@ STOP = threading.Event()        # set by the tray icon's "Stop Goldmire"
 RESTART = threading.Event()     # set after an update is installed: start Goldmire again
 BOTS_LIVE = []                  # the running heroes (same dicts the main loop uses)
 RECONCILED = []                 # Ysolde has done her start-up check
+DESK = []                       # the Calendar Desk (earnings + economic calendar)
 LAST_OPEN = [False]             # was the market open last round (a close triggers her daily check)
 BENCH_LOCK = threading.Lock()
 BENCH_EVENTS = []               # (hero, benched) from the town's bench buttons, for the chronicle
@@ -619,8 +622,11 @@ def _book_sale(bot, memory, symbol, locked_in, reason, h, paid, price):
 # ---------------------------------------------------------------------------
 # ONE BOT, ONE ROUND
 # ---------------------------------------------------------------------------
-def _learned_signal(st, bars, position=None):
+def _learned_signal(st, bars, position=None, market=None):
     view = {k: bars[k][-st.lookback:] for k in ("o", "h", "l", "c", "v")}
+    view["t"] = bars.get("t", [])[-st.lookback:]
+    if getattr(st, "needs_market", False):
+        view["m"] = market or []            # S&P 500 daily closes (market weather)
     try:
         return st.signal(view, position) if st.wants_position else st.signal(view)
     except Exception as e:  # noqa: BLE001 - a strategy hiccup skips this symbol, it doesn't stop the hero
@@ -638,6 +644,14 @@ def learned_strategy(bot, rnd, memory):
     def fetch(symbols):
         return rnd.bars(symbols, kind, st.timeframe)
 
+    market = None
+    if getattr(st, "needs_market", False):
+        try:
+            market = rnd.bars(["SPY"], "stock", "1Day")["SPY"]["c"][-300:]
+        except Exception as e:  # noqa: BLE001 - no market prices: weather strategies make no new buys
+            log.error(f"[{bot['name']}] market weather unavailable -> {e}")
+            market = []
+
     def decide(sym, bars):
         if norm(sym) in rnd.positions and sym in held:
             pos = rnd.positions[norm(sym)]
@@ -647,8 +661,8 @@ def learned_strategy(bot, rnd, memory):
                 bars_held = sum(1 for t in bars["t"] if t >= since)
             except (TypeError, ValueError):
                 bars_held = 0
-            return _learned_signal(st, bars, {"entry": float(pos.avg_entry_price), "bars_held": bars_held})
-        return _learned_signal(st, bars, None)
+            return _learned_signal(st, bars, {"entry": float(pos.avg_entry_price), "bars_held": bars_held}, market)
+        return _learned_signal(st, bars, None, market)
     return st, fetch, decide
 
 
@@ -894,8 +908,9 @@ def build_status(positions, memory, market_open, bots):
         pos_list = []
         for sym, h in held.items():
             p = positions.get(norm(sym))
+            e = DESK[0].earnings_for(sym) if DESK else None
             pos_list.append({"symbol": sym, "cost": h["cost"], "pl": round(float(p.unrealized_pl), 2) if p else 0.0,
-                             "pending": p is None})
+                             "pending": p is None, "earnings": e and {"date": e["date"], "when": e["when"]}})
         realized = round(memory["realized"].get(b["name"], 0.0), 2)
         unrealized = round(sum(p["pl"] for p in pos_list), 2)
         out.append({
@@ -931,6 +946,23 @@ def build_status(positions, memory, market_open, bots):
     }
 
 
+def market_weather(rnd, memory):
+    """Today's market weather (S&P 500 trend + jumpiness), kept in memory for the town. Never raises."""
+    try:
+        sys.path.insert(0, os.path.join(HERE, "strategies"))
+        import _weather
+        c = rnd.bars(["SPY"], "stock", "1Day")["SPY"]["c"]
+        w = _weather.weather(c)
+        if w:
+            old = (memory.get("weather") or {}).get("state")
+            memory["weather"] = {**w, "at": datetime.now().isoformat(timespec="seconds")}
+            if old != w["state"]:
+                log.info(f"Market weather: {w['state']} (S&P 500 {'above' if w['trend_up'] else 'below'} its 200-day average, "
+                         f"jumpier than {w['vol_rank']:.0%} of the last year)")
+    except Exception as e:  # noqa: BLE001
+        log.error(f"Market weather: couldn't read the S&P 500 -> {e}")
+
+
 def guardians_status(memory, positions, bots):
     """What Pip, Old Bram and Ysolde are watching right now, for their cards in the town."""
     today = report.ny().strftime("%Y-%m-%d")
@@ -954,6 +986,7 @@ def guardians_status(memory, positions, bots):
                  "stopped": total <= -risk.DAILY_STOP_DOLLARS, "stock_share": risk.MAX_STOCK_SHARE,
                  "industry_share": risk.MAX_INDUSTRY_SHARE, "industry_limit": round(combined * risk.MAX_INDUSTRY_SHARE, 2),
                  "industries": [{"name": k, "value": round(v, 2)} for k, v in top]},
+        "weather": memory.get("weather"),
         "validator": [{"name": b["name"], "hero": b.get("hero", b["name"]),
                        "verdict": memory.get("validation", {}).get(b["name"], {}).get("verdict") or "not judged yet",
                        "approved": bool(b.get("owner_approved"))} for b in working],
@@ -990,6 +1023,14 @@ def update_world(trading, memory, market_open, bots):
     if watchdog.DOG:
         watchdog.DOG.tidy()
         status["alerts"] = watchdog.DOG.active()
+    try:
+        status["scorecard"] = scorecard.update(memory, bots, positions, (memory.get("weather") or {}).get("spy"),
+                                               report.ny().strftime("%Y-%m-%d"), norm, lambda b: bank._acct(memory, b)["pot"], log.info)
+    except Exception as e:  # noqa: BLE001
+        log.error(f"Scorecard: couldn't update -> {e}")
+    if DESK:
+        held = {s: game.hero_of(b)[0] for b in bots for s in held_by(memory, b)}
+        status["calendar"] = DESK[0].summary(held)
     try:
         status["guardians"] = guardians_status(memory, positions, bots)
     except Exception as e:  # noqa: BLE001 - a bonus panel; never stop the heroes over it
@@ -1431,6 +1472,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     news_client = NewsClient(key, secret)
 
     watchdog.start(WORLD_DIR)                  # alerts in the town when a problem keeps repeating
+    DESK[:] = [calendar_desk.Desk()]
     memory = load_memory()
     apply_pot_topups(memory, bots)
     validator.review(bots, memory, log.info)
@@ -1520,6 +1562,9 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
             RECONCILED.append(True)
         if rnd:
             LAST_OPEN[0] = rnd.market_open
+        if rnd:
+            market_weather(rnd, memory)
+            DESK[0].refresh(report.ny().date(), log.info)
         if rnd:
             game.MARKET_OPEN = rnd.market_open
             for bot in bots:

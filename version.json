@@ -1,6 +1,8 @@
 {
-  "version": "1.5.16",
+  "version": "1.5.17",
   "notes": [
-    "Quieter log: Old Bram now notes a blocked trader once a day instead of every 5 minutes."
+    "New Scorecard in the town: each trader's real result next to the same money in the S&P 500, and live vs tested win rate. Flags a trader that falls behind its tests.",
+    "Market weather on Pip's card (S&P 500 trend and jumpiness), and two new weather-aware strategies to test.",
+    "New Calendar: upcoming earnings for the heroes' stocks (also marked on each stock) and the big US economic releases."
   ]
 }

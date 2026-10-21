@@ -92,8 +92,9 @@ DATA_MAX_AGE_HOURS = 20                         # re-download history once a day
 class Strategy:
     def __init__(self, key, name, signal, timeframe="15Min", markets=("stock", "crypto"), stop_loss=None,
                  take_profit=None, source="", rules="", builtin=False, lookback=LOOKBACK, style=None,
-                 exit_mode="signal", variant=None, base=None):
+                 exit_mode="signal", variant=None, base=None, needs_market=False):
         self.key, self.name, self.signal, self.timeframe = key, name, signal, timeframe
+        self.needs_market = needs_market   # gets the S&P 500 fund's daily closes as bars["m"] (market weather)
         self.markets, self.stop_loss, self.take_profit = tuple(markets), stop_loss, take_profit
         self.source, self.rules, self.builtin, self.lookback = source, rules, builtin, lookback
         self.style = style or key      # which researcher scoring fits it: ma_cross / rsi / breakout
@@ -166,7 +167,7 @@ def load_strategy_file(path):
                     getattr(mod, "MARKETS", ("stock", "crypto")), getattr(mod, "STOP_LOSS", None),
                     getattr(mod, "TAKE_PROFIT", None), getattr(mod, "SOURCE", ""), (mod.__doc__ or "").strip(),
                     lookback=getattr(mod, "LOOKBACK", LOOKBACK), style=getattr(mod, "STYLE", "ma_cross"),
-                    exit_mode=getattr(mod, "EXIT", "signal"))
+                    exit_mode=getattr(mod, "EXIT", "signal"), needs_market=bool(getattr(mod, "NEEDS_MARKET", False)))
 
 
 def file_strategies(log=print):
@@ -263,6 +264,17 @@ def fetch_history(market, tf, log=print, symbols=None, tag=""):
 # ---------------------------------------------------------------------------
 # THE REPLAY
 # ---------------------------------------------------------------------------
+MARKET = {"d": [], "c": []}       # SPY daily closes by date, for strategies with NEEDS_MARKET
+MARKET_LOOKBACK = 300
+
+
+def _market_view(day):
+    """SPY closes up to and including `day` (YYYY-MM-DD), the last MARKET_LOOKBACK of them."""
+    import bisect
+    j = bisect.bisect_right(MARKET["d"], day)
+    return MARKET["c"][max(0, j - MARKET_LOOKBACK):j]
+
+
 def simulate(strategy, series, market, errors=None, cost=None):
     """Replays one symbol. Returns a list of trades: {entry_t, exit_t, ret (after costs), exit_i, why}.
     Errors raised by the strategy are counted in `errors` (a dict) rather than stopping the test."""
@@ -312,6 +324,8 @@ def simulate(strategy, series, market, errors=None, cost=None):
         # 3) the strategy looks at everything up to this bar's close
         lo = max(0, i + 1 - lb)
         view = {k: series[k][lo:i + 1] for k in ("o", "h", "l", "c", "v", "t")}   # t: bar dates (calendar strategies)
+        if strategy.needs_market:
+            view["m"] = _market_view(str(t[i])[:10])
         try:
             if strategy.wants_position:
                 pos = None if entry is None else {"entry": entry / (1 + cost), "bars_held": i - entry_i}
@@ -427,6 +441,13 @@ def verdict(s, best_builtin_pl):
 # ---------------------------------------------------------------------------
 def run(only=None, log=print, fetch=fetch_history):
     strategies = all_strategies(only, log)
+    if any(st.needs_market for st in strategies):
+        try:
+            spy = fetch_history("stock", "1Day", log, symbols=["SPY"], tag="_mkt").get("SPY") or {}
+            MARKET["d"], MARKET["c"] = [str(x)[:10] for x in spy.get("t", [])], list(spy.get("c", []))
+            log(f"Market weather: {len(MARKET['c'])} days of S&P 500 (SPY) prices loaded")
+        except Exception as e:  # noqa: BLE001
+            log(f"Couldn't load S&P 500 prices for the market weather ({e}); weather strategies will stay out")
     results = []
     cache = {}
     for st in strategies:

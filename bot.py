@@ -197,6 +197,9 @@ SETTINGS_UPDATES = [
     ("2026-10-22-xrp-hold", "you asked Gareth to buy $100 of XRP and hold it until you say sell", {
         "Stock-1": {"owner_holds": {"XRP/USD": 100}},
     }),
+    ("2026-10-22-xrp-300", "you asked for $200 more XRP: Gareth's XRP hold goes to $300 in all", {
+        "Stock-1": {"owner_holds": {"XRP/USD": 300}},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [
@@ -708,13 +711,20 @@ def owner_holds(rnd, bots, memory):
         done = memory.setdefault("owner_holds_done", {}).setdefault(b["name"], [])
         who = f"[{b['name']}]"
         for sym, dollars in want.items():
-            sym = sym.upper()
-            if sym in held or sym in done:
-                continue
-            key = f"{b['name']}:{sym}"
+            sym, dollars = sym.upper(), float(dollars)
+            h = held.get(sym)
+            if h is not None and not h.get("hold"):
+                continue                               # the hero's own trade in it; leave it be
+            have = float(h.get("cost", 0)) if h else 0.0
+            if h is None and sym in done:
+                continue                               # bought once and since sold or gone: not again
+            extra = round(dollars - have, 2)
+            if extra < 1:
+                continue                               # already holds what you asked for
+            key = f"{b['name']}:{sym}:{dollars:g}"
             if tries.get(key, 0) >= 3:
                 continue                               # said so already; fix it, then restart
-            if norm(sym) in rnd.positions or norm(sym) in rnd.open_orders:
+            if h is None and (norm(sym) in rnd.positions or norm(sym) in rnd.open_orders):
                 log.info(f"{who} owner hold {sym}: the account already holds it outside this hero; not buying it twice")
                 done.append(sym)
                 save_memory(memory)
@@ -723,11 +733,16 @@ def owner_holds(rnd, bots, memory):
                 continue                               # a stock waits for the market to open
             try:
                 kind = "crypto" if "/" in sym else "stock"
-                if place_buy(rnd, {**b, "kind": kind}, memory, sym, float(dollars)):
-                    held[sym]["hold"] = True
-                    done.append(sym)
+                if place_buy(rnd, {**b, "kind": kind}, memory, sym, extra):
+                    nh = held[sym]
+                    if h:                              # adding to the hold: one entry, total cost
+                        nh.update({"cost": round(have + extra, 2), "opened": h.get("opened", nh["opened"])})
+                    nh["hold"] = True
+                    if sym not in done:
+                        done.append(sym)
                     save_memory(memory)
-                    log.info(f"{who} OWNER HOLD {sym}: bought ${float(dollars):,.2f} for you; held until you say sell")
+                    log.info(f"{who} OWNER HOLD {sym}: bought ${extra:,.2f} for you"
+                             + (f" (now ${have + extra:,.2f} in all)" if h else "") + "; held until you say sell")
             except Exception as e:  # noqa: BLE001
                 tries[key] = tries.get(key, 0) + 1
                 save_memory(memory)

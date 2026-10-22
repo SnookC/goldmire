@@ -1,7 +1,6 @@
 {
-  "version": "1.5.18",
+  "version": "1.5.19",
   "notes": [
-    "Gareth buys $100 of XRP for you and holds it until you say sell (a new 'owner hold': no stops, no strategy sales).",
-    "Pip counts coins as their own 'Crypto' industry."
+    "Gareth adds $200 more XRP for you: $300 in all, held until you say sell."
   ]
 }

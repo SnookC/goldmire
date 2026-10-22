@@ -219,6 +219,21 @@ THE TEAM: TWO TRADERS AND THREE GUARDIANS (from version 1.5.11)
       any part of the account's change today the heroes' trades don't explain.
       A gap over $25 is logged as a WARNING.
 
+FINBERT: A SECOND NEWS READER, IN SHADOW (from version 1.5.21)  -- finbert.py, news_replay.py
+  The Town Crier reads headlines with a word list. FinBERT is a small free AI model
+  (ProsusAI/finbert, from Hugging Face) trained on financial news. It reads every
+  headline too, but for now it DECIDES NOTHING: no sales, no blocked buys.
+  * First start: Goldmire installs it by itself in the background (about 1.5 GB of
+    downloads, a few minutes). Trading carries on meanwhile. Log: "FinBERT: ready".
+  * Where the two readers disagree, it's written to news_shadow.jsonl, and to the log
+    when it's about a stock a hero holds ("FinBERT (shadow): ...").
+  * The replay test checks the last 60 days of real headlines: after each reader's
+    bad-news calls, did the stock really do worse than the S&P 500 the next day?
+    Goldmire runs it by itself once FinBERT is ready, then weekly; or double-click
+    9_test_news_reader.bat. Report: proving_grounds\news_replay.html
+  * FinBERT only gets a vote if it beats the word list by a margin that isn't luck,
+    and then only with your OK.
+
 YOUR HOLDS: BUY SOMETHING AND KEEP IT UNTIL YOU SAY SELL (from version 1.5.18)
   In bots.json a hero can carry "owner_holds", like  "owner_holds": {"XRP/USD": 100}.
   The hero buys each one ONCE for that many dollars, then leaves it alone: no strategy sale,

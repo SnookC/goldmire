@@ -197,7 +197,12 @@ def _desk(memory):
     return d
 
 
-def watch(news_client, memory, log, now=None):
+def word_alarm(st):
+    """The word list's bad-news call on one story (not counting how fresh it is)."""
+    return not st.get("roundup") and st["tone"] <= -STRONG and st.get("strength", -1) < 0
+
+
+def watch(news_client, memory, log, now=None, reader=None):
     """Checks the newest stories. Returns {"tips": {"stock": [...], "crypto": [...]}, "alarms": [...], "new": n}."""
     now = now or datetime.now(timezone.utc)
     desk = _desk(memory)
@@ -207,6 +212,13 @@ def watch(news_client, memory, log, now=None):
     desk["last_check"] = now.isoformat()
     seen = set(desk["seen"])
     fresh = sorted((s for s in stories if s["id"] not in seen), key=lambda s: s["time"], reverse=True)   # newest first
+    if reader and fresh:                            # FinBERT in shadow: it reads them too, decides nothing
+        try:
+            got = reader([st["headline"] for st in fresh])
+            for st, sc in zip(fresh, got or []):
+                st["fb"] = sc
+        except Exception as e:  # noqa: BLE001
+            log(f"FinBERT couldn't read this round's headlines ({e})")
     tips, alarms = {"stock": [], "crypto": []}, []
     for st in reversed(fresh):                      # oldest first, so the crier reads in order
         age = (now - _aware(st["time"])).total_seconds() / 3600
@@ -233,7 +245,7 @@ def watch(news_client, memory, log, now=None):
     for k, b in list(desk.get("boosts", {}).items()):
         if (now - _aware(b["time"])).total_seconds() > BOOST_HOURS * 3600 or k in desk["alarms"]:
             desk["boosts"].pop(k)                       # faded, or bad news since
-    return {"tips": tips, "alarms": alarms, "new": len(fresh)}
+    return {"tips": tips, "alarms": alarms, "new": len(fresh), "fresh": fresh}
 
 
 def boost_for(memory, symbol):

@@ -1,6 +1,7 @@
 {
-  "version": "1.5.20",
+  "version": "1.5.21",
   "notes": [
-    "Gareth moves your $300 from XRP into XRPN (Evernorth): buys XRPN first, then sells the XRP. Still held until you say sell."
+    "FinBERT, an AI news reader from Hugging Face, now reads every headline next to the word list, in shadow: it decides nothing yet. It installs itself the first time (a few minutes, in the background).",
+    "A replay test on the last 60 days of real headlines checks whose bad-news calls were right. Report: proving_grounds/news_replay.html"
   ]
 }

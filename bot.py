@@ -42,6 +42,8 @@ import validator
 import watchdog
 import calendar_desk
 import scorecard
+import finbert
+import news_replay
 
 # ---------------------------------------------------------------------------
 # SETTINGS  (bots themselves are in bots.json)
@@ -1480,7 +1482,8 @@ def watch_news(news_client, bots, memory):
     """Every round: read the newest stories. Big good news sends a researcher out now;
     big bad news raises an alarm (no buys, and bots holding it sell)."""
     try:
-        found = news.watch(news_client, memory, lambda msg: log.info(f"Town Crier: {msg}"))
+        found = news.watch(news_client, memory, lambda msg: log.info(f"Town Crier: {msg}"),
+                           reader=finbert.score if finbert.ready() else None)
     except Exception as e:  # noqa: BLE001 - news is a bonus; never stop the bots over it
         log.error(f"Town Crier: couldn't read the news this round -> {e}")
         return
@@ -1503,7 +1506,72 @@ def watch_news(news_client, bots, memory):
         game.record_news(memory, False, sym, news.short(story["headline"], 90), "crypto" if "/" in sym else "stock")
         log.info(f"Town Crier: bad news on {sym}: \"{news.short(story['headline'])}\""
                  + (" - heroes holding it get out this round." if sym.replace("/", "") in held else " - no hero will buy it for now."))
+    news_shadow(found.get("fresh", []), held, memory)
     save_memory(memory)
+
+
+REPLAY = []    # [news client, stock data client, running?]
+
+
+def maybe_news_replay(memory):
+    """Once FinBERT is ready: the replay test, in the background, now and then once a week."""
+    if not REPLAY or REPLAY[2] or not finbert.ready() or not news_replay.due():
+        return
+    if memory.get("news_replay_tried", "") > (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat():
+        return                                  # failed recently: wait a while before trying again
+    memory["news_replay_tried"] = datetime.now(timezone.utc).isoformat()
+    REPLAY[2] = True
+    extra = [s for h in memory.get("held", {}).values() for s in h]
+
+    def work():
+        try:
+            news_replay.run(REPLAY[0], REPLAY[1], lambda m: log.info(m), extra=extra)
+        except Exception as e:  # noqa: BLE001
+            log.info(f"News replay: didn't finish ({e}); trying again later")
+        finally:
+            REPLAY[2] = False
+    threading.Thread(target=work, daemon=True, name="news-replay").start()
+
+
+SHADOW_FILE = os.path.join(HERE, "news_shadow.jsonl")
+SHADOW_KEEP = 3000
+
+
+def news_shadow(stories, held, memory):
+    """FinBERT's shadow notes: every story where it and the word list disagree on bad news.
+    Disagreements on a stock a hero holds are also written to the log."""
+    rows = []
+    for st in stories:
+        sc = st.get("fb")
+        if sc is None or st.get("roundup"):
+            continue
+        w, f = news.word_alarm(st), finbert.is_alarm(sc)
+        c = memory.setdefault("news_shadow", {"stories": 0, "word": 0, "finbert": 0, "both": 0})
+        c["stories"] += 1
+        c["word"] += w
+        c["finbert"] += f
+        c["both"] += w and f
+        if w == f:
+            continue
+        syms = [news.to_trade_symbol(x) for x in st["symbols"]]
+        rows.append({"time": st["time"], "symbols": syms, "headline": st["headline"], "word_tone": st["tone"],
+                     "word_alarm": w, "finbert": sc, "finbert_alarm": f})
+        mine = [x for x in syms if x.replace("/", "") in held]
+        if mine:
+            log.info(f"FinBERT (shadow): {'word list says sell' if w else 'word list says fine'}, "
+                     f"FinBERT says {finbert.label(sc)} on {', '.join(mine)}: \"{news.short(st['headline'])}\"")
+    if not rows:
+        return
+    try:
+        old = []
+        if os.path.exists(SHADOW_FILE):
+            with open(SHADOW_FILE, encoding="utf-8") as fh:
+                old = fh.readlines()[-(SHADOW_KEEP - len(rows)):]
+        with open(SHADOW_FILE + ".tmp", "w", encoding="utf-8") as fh:
+            fh.writelines(old + [json.dumps(r) + "\n" for r in rows])
+        os.replace(SHADOW_FILE + ".tmp", SHADOW_FILE)
+    except OSError:
+        pass
 
 
 def run_research(market, trading, stock_data, crypto_data, screener, news_client, bots, memory):
@@ -1569,6 +1637,8 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     news_client = NewsClient(key, secret)
 
     watchdog.start(WORLD_DIR)                  # alerts in the town when a problem keeps repeating
+    REPLAY[:] = [news_client, stock_data, False]
+    finbert.start(lambda m: log.info(m))       # second news reader, in shadow (installs itself the first time)
     DESK[:] = [calendar_desk.Desk()]
     memory = load_memory()
     apply_pot_topups(memory, bots)
@@ -1662,6 +1732,8 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
         if rnd:
             market_weather(rnd, memory)
             DESK[0].refresh(report.ny().date(), log.info)
+        if rnd:
+            maybe_news_replay(memory)
         if rnd:
             game.MARKET_OPEN = rnd.market_open
             try:

@@ -25,6 +25,17 @@ THE RULES (set before seeing any results, Oct 22 2026):
     the margin alone could be passed by chance; still before any real results)
   * the winner still needs your OK before it's allowed to trigger sales
 
+SECOND QUESTION (added Oct 22 2026, also before any results): is a story really ABOUT the
+stock? Alpaca tags a story with every symbol it touches (a Lam Research story also gets
+SOXX, the chip fund). The check only counts a bad-news call when the headline names the
+company or its ticker (news.about). The rules:
+  * at least MIN_ALARMS of the word list's calls must fail the check ("not about it")
+  * selling on those calls must NOT have helped: the stock did no worse than the
+    S&P 500 the next day on average (>= 0)
+  * and the calls that pass the check must be at least as good as the word list's overall
+  * then the check is switched on (with your OK). It means selling LESS, never more,
+    which is why the bar is lower than for FinBERT.
+
 Run it with 9_test_news_reader.bat, or Goldmire runs it by itself once FinBERT is ready
 (and again each week). Results: proving_grounds/news_replay.html
 """
@@ -66,6 +77,9 @@ def due():
     try:
         with open(OUT_JSON, encoding="utf-8") as f:
             run = datetime.fromisoformat(json.load(f)["run"])
+        with open(OUT_JSON, encoding="utf-8") as f:
+            if "about_verdict" not in json.load(f):
+                return True                        # made before the 'about this stock?' test existed
         return datetime.now(timezone.utc) - run > timedelta(days=RERUN_DAYS)
     except (OSError, ValueError, KeyError, TypeError):
         return True
@@ -146,7 +160,7 @@ def _between(series, a, b):
     return cl[j] / op[i] - 1
 
 
-def outcomes(stories, bars):
+def outcomes(stories, bars, names=None):
     """One row per (story, test stock): what the stock did next, beyond the S&P 500."""
     spy = bars.get("SPY")
     rows, used = [], set()
@@ -165,7 +179,8 @@ def outcomes(stories, bars):
             m3 = _between(spy, a3, b3) if (spy and r3 is not None) else 0.0
             rows.append({"story": st["id"], "symbol": sym, "time": st["time"], "headline": st["headline"],
                          "entry": a, "adj1": r1 - (m1 or 0.0), "adj3": (r3 - (m3 or 0.0)) if r3 is not None else None,
-                         "word": news.word_alarm(st), "fb": st.get("fb"), "finbert": finbert.is_alarm(st.get("fb"))})
+                         "word": news.word_alarm(st), "fb": st.get("fb"), "finbert": finbert.is_alarm(st.get("fb")),
+                         "about": news.about(st["headline"], sym, (names or {}).get(sym, ""))})
     return rows
 
 
@@ -207,7 +222,21 @@ def judge(groups):
     return "SWITCH: " + name, f"{name}'s bad-news calls were followed by prices {gap:.2%} a day weaker than the word list's ({t:.1f} standard errors)"
 
 
-def run(news_client, stock_data, log=print, extra=(), days=DAYS):
+def judge_about(groups):
+    """The 'is it about this stock?' rules written at the top of this file."""
+    out, keep, word = groups["word_not_about"], groups["word_about"], groups["word"]
+    if out.get("n", 0) < MIN_ALARMS:
+        return "TOO FEW", f"only {out.get('n', 0)} of the word list's calls were about a different company (needs {MIN_ALARMS})"
+    if out["avg1"] < 0:
+        return "DON'T ADD", (f"selling on stories about other companies still helped ({out['avg1']:+.2%} a day vs the S&P 500), "
+                             "so the check would throw away useful sales")
+    if keep.get("n", 0) and keep["avg1"] > word["avg1"]:
+        return "DON'T ADD", "the calls that pass the check were no better than the word list's overall"
+    return "ADD THE CHECK", (f"stocks the word list sold over someone else's news then did {out['avg1']:+.2%} a day vs the S&P 500 "
+                             f"(selling didn't help), while calls that named the company did {keep['avg1']:+.2%}")
+
+
+def run(news_client, stock_data, log=print, extra=(), days=DAYS, names=None):
     if not finbert.load_now(log):
         raise RuntimeError("FinBERT isn't available: " + finbert.status())
     end = datetime.now(timezone.utc) - timedelta(minutes=20)
@@ -220,7 +249,7 @@ def run(news_client, stock_data, log=print, extra=(), days=DAYS):
     log(f"News replay: FinBERT is reading {len(todo)} headlines")
     for st, sc in zip(todo, finbert.score([s["headline"] for s in todo]) or []):
         st["fb"] = sc
-    rows = outcomes(stories, bars)
+    rows = outcomes(stories, bars, names)
     groups = {
         "all": _stats(rows),
         "word": _stats([r for r in rows if r["word"]]),
@@ -228,8 +257,11 @@ def run(news_client, stock_data, log=print, extra=(), days=DAYS):
         "both": _stats([r for r in rows if r["word"] and r["finbert"]]),
         "word_only": _stats([r for r in rows if r["word"] and not r["finbert"]]),
         "finbert_only": _stats([r for r in rows if r["finbert"] and not r["word"]]),
+        "word_about": _stats([r for r in rows if r["word"] and r["about"]]),
+        "word_not_about": _stats([r for r in rows if r["word"] and not r["about"]]),
     }
     verdict, why = judge(groups)
+    about_verdict, about_why = judge_about(groups) if names else ("NOT RUN", "no company names to check against")
 
     def ex(pick, k=12):
         out = {}
@@ -240,9 +272,11 @@ def run(news_client, stock_data, log=print, extra=(), days=DAYS):
 
     result = {"run": datetime.now(timezone.utc).isoformat(timespec="seconds"), "days": days, "stocks": len(syms),
               "stories": len(stories), "rated": len(rows), "groups": groups, "verdict": verdict, "why": why,
+              "about_verdict": about_verdict, "about_why": about_why,
               "rules": {"min_alarms": MIN_ALARMS, "margin": MARGIN, "min_t": MIN_T, "finbert_alarm": f"bad >= {finbert.ALARM_NEG:.0%}"},
               "examples": {"word_only": ex(lambda r: r["word"] and not r["finbert"]),
-                           "finbert_only": ex(lambda r: r["finbert"] and not r["word"])}}
+                           "finbert_only": ex(lambda r: r["finbert"] and not r["word"]),
+                           "not_about": ex(lambda r: r["word"] and not r["about"], 20)}}
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=1)
@@ -250,7 +284,9 @@ def run(news_client, stock_data, log=print, extra=(), days=DAYS):
         f.write(_html(result))
     g = groups
     log(f"News replay: {verdict}. {why}")
-    for k, label in (("word", "word list"), ("finbert", "FinBERT"), ("both", "both agree"), ("all", "every story")):
+    log(f"News replay, 'is it about this stock?': {about_verdict}. {about_why}")
+    for k, label in (("word", "word list"), ("finbert", "FinBERT"), ("both", "both agree"), ("word_about", "names it"),
+                     ("word_not_about", "other company"), ("all", "every story")):
         s = g[k]
         if s.get("n"):
             log(f"    {label:12} {s['n']:5} calls, next day {s['avg1']:+.2%} vs the S&P 500 (fell {s['down1']:.0%} of the time)")
@@ -267,7 +303,8 @@ def _share(g):
 def _html(r):
     e = html.escape
     names = {"all": "Every story (for comparison)", "word": "Word list says bad news", "finbert": "FinBERT says bad news",
-             "both": "Both agree it's bad news", "word_only": "Only the word list says bad", "finbert_only": "Only FinBERT says bad"}
+             "both": "Both agree it's bad news", "word_only": "Only the word list says bad", "finbert_only": "Only FinBERT says bad",
+             "word_about": "Word list says bad, headline names the company", "word_not_about": "Word list says bad, but it's about another company"}
 
     def pct(x):
         return "" if x is None else f"{x:+.2%}"
@@ -285,10 +322,12 @@ body{{font:15px/1.5 system-ui,sans-serif;margin:0;padding:20px 16px;background:#
 h1{{font-size:24px;margin:0 0 4px}}.v{{font-size:20px;font-weight:700;color:#e8c46a;margin:14px 0 2px}}table{{border-collapse:collapse;width:100%;margin:10px 0 22px}}
 td,th{{padding:6px 8px;border-bottom:1px solid #3a3020;text-align:left;vertical-align:top}}th{{color:#b9a77f;font-weight:600}}.pos{{color:#8fd18a}}.neg{{color:#f08a7a}}
 .wrap{{overflow-x:auto}}p.s{{color:#b9a77f;margin:2px 0}}</style></head><body><main>
-<h1>News replay: word list vs FinBERT</h1><p class="s">{e(r['run'][:16].replace('T', ' '))} UTC · last {r['days']} days · {r['stocks']} stocks · {r['stories']} stories, {r['rated']} rated</p>
+<h1>News replay</h1><p class="s">{e(r['run'][:16].replace('T', ' '))} UTC · last {r['days']} days · {r['stocks']} stocks · {r['stories']} stories, {r['rated']} rated</p>
 <div class="v">{e(r['verdict'])}</div><p>{e(r['why'])}</p>
 <p class="s">"Next day" = how the stock did over the next trading day after the story, minus the S&amp;P 500. Selling on a bad-news call helps when this is negative: lower is better.</p>
 <div class="wrap"><table><tr><th>Which stories</th><th>Calls</th><th>Next day</th><th>Median</th><th>Fell</th><th>3 days</th></tr>{rows}</table></div>
+<h2>Is it about this stock?</h2><div class="v">{e(r.get('about_verdict', ''))}</div><p>{e(r.get('about_why', ''))}</p>
+<h3>Bad-news calls about another company (the check would skip these)</h3><div class="wrap"><table><tr><th>When (UTC)</th><th></th><th>Headline</th><th>FinBERT</th><th>Next day</th></tr>{ex(r['examples'].get('not_about', []))}</table></div>
 <h2>Only the word list called these bad (FinBERT disagreed)</h2><div class="wrap"><table><tr><th>When (UTC)</th><th></th><th>Headline</th><th>FinBERT</th><th>Next day</th></tr>{ex(r['examples']['word_only'])}</table></div>
 <h2>Only FinBERT called these bad</h2><div class="wrap"><table><tr><th>When (UTC)</th><th></th><th>Headline</th><th>FinBERT</th><th>Next day</th></tr>{ex(r['examples']['finbert_only'])}</table></div>
 <p class="s">Rules set before any results: at least {r['rules']['min_alarms']} calls to be judged; FinBERT only replaces the word list if its calls beat it by {r['rules']['margin']:.2%} a day and by at least {r['rules']['min_t']:.0f} standard errors (not luck); any switch needs your OK.</p>
@@ -304,7 +343,10 @@ def main():
     if not key or not secret or "PASTE" in key:
         raise SystemExit("Your Alpaca keys aren't set up yet (the .env file).")
     print("News replay: word list vs FinBERT on real past headlines. The first time takes a while (installing FinBERT).\n")
-    run(NewsClient(key, secret), StockHistoricalDataClient(key, secret), print)
+    from alpaca.trading.client import TradingClient
+    import research
+    names = {a.symbol: a.name for a in research.us_equities(TradingClient(key, secret, paper=True))}
+    run(NewsClient(key, secret), StockHistoricalDataClient(key, secret), print, names=names)
     print(f"\nFull report: {OUT_HTML}")
     if "--no-open" not in sys.argv:
         import webbrowser

@@ -1525,7 +1525,8 @@ def maybe_news_replay(memory):
 
     def work():
         try:
-            news_replay.run(REPLAY[0], REPLAY[1], lambda m: log.info(m), extra=extra)
+            names = {a.symbol: a.name for a in research.us_equities(REPLAY[3])}
+            news_replay.run(REPLAY[0], REPLAY[1], lambda m: log.info(m), extra=extra, names=names)
         except Exception as e:  # noqa: BLE001
             log.info(f"News replay: didn't finish ({e}); trying again later")
         finally:
@@ -1637,7 +1638,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     news_client = NewsClient(key, secret)
 
     watchdog.start(WORLD_DIR)                  # alerts in the town when a problem keeps repeating
-    REPLAY[:] = [news_client, stock_data, False]
+    REPLAY[:] = [news_client, stock_data, False, trading]
     finbert.start(lambda m: log.info(m))       # second news reader, in shadow (installs itself the first time)
     DESK[:] = [calendar_desk.Desk()]
     memory = load_memory()

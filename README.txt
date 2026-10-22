@@ -233,6 +233,10 @@ FINBERT: A SECOND NEWS READER, IN SHADOW (from version 1.5.21)  -- finbert.py, n
     9_test_news_reader.bat. Report: proving_grounds\news_replay.html
   * FinBERT only gets a vote if it beats the word list by a margin that isn't luck,
     and then only with your OK.
+  * The same replay also tests an "is this story really ABOUT this stock?" check
+    (from 1.5.23): a bad-news sale only when the headline names the company or its
+    ticker. (A Lam Research story also gets tagged SOXX, the chip fund.) Off until
+    the test backs it and you OK it.
 
 YOUR HOLDS: BUY SOMETHING AND KEEP IT UNTIL YOU SAY SELL (from version 1.5.18)
   In bots.json a hero can carry "owner_holds", like  "owner_holds": {"XRP/USD": 100}.

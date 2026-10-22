@@ -1,7 +1,6 @@
 {
-  "version": "1.5.22",
+  "version": "1.5.23",
   "notes": [
-    "Quieter log: FinBERT's download messages no longer show up.",
-    "The Scorecard leaves out your holds' sales too (the XRP swap no longer counts against Gareth)."
+    "The news replay also tests an 'is this story really about this stock?' check: a bad-news sale only when the headline names the company. It runs by itself in a few minutes; nothing changes in trading until you OK it."
   ]
 }

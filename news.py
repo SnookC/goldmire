@@ -197,6 +197,64 @@ def _desk(memory):
     return d
 
 
+# ---------------------------------------------------------------------------
+# Is a story really ABOUT this stock? (Benzinga tags a story with every symbol it touches:
+# a Lam Research story also gets SOXX, the chip fund that holds it.)
+# ---------------------------------------------------------------------------
+ABOUT_CHECK = False      # on only after the replay test backs it AND you OK it
+_SUFFIX = re.compile(r"\b(incorporated|inc|corporation|corp|company|co|ltd|limited|plc|holdings?|group|n\.?v|s\.?a|ag|se|lp|llc|"
+                     r"class [a-c]|common stock|ordinary shares|american depositary shares?|ads|sponsored|new|the)\b\.?", re.I)
+_GENERIC = {"american", "united", "general", "first", "national", "international", "global", "bank", "texas", "new", "north",
+            "south", "west", "east", "southern", "western", "eastern", "pacific", "atlantic", "us", "u.s.", "royal", "capital",
+            "energy", "financial", "health", "healthcare", "digital", "advanced", "applied", "great", "home", "public", "realty",
+            "the", "san", "big", "red", "blue", "green", "gold", "silver", "data", "world", "standard", "central", "union"}
+_FUNDS = re.compile(r"\b(etf|fund|trust|ishares|spdr|vanguard|invesco|proshares|direxion|index|portfolio|shares)\b", re.I)
+_KEYS = {}
+
+
+def name_keys(name):
+    """Words that mean a company is named: "Lam Research Corporation" -> ["lam research", "lam"].
+    Funds get none (a fund is never the subject of a headline about one of its holdings)."""
+    if not name or _FUNDS.search(name):
+        return []
+    clean = re.sub(r"[^a-z0-9&.' -]", " ", _SUFFIX.sub(" ", name.lower().replace(",", " ")))
+    words = [w.strip(".'") for w in clean.split() if w.strip(".'")]
+    if not words:
+        return []
+    keys = [" ".join(words)]                         # the whole name: "las vegas sands"
+    if len(words[0]) >= 4 and words[0] not in _GENERIC:
+        keys.append(words[0])                        # a distinctive first word: "nvidia", "goldman"
+    elif len(words) >= 3 and words[1] not in _GENERIC and words[1] != "&" and len(words[0]) >= 4:
+        keys.append(" ".join(words[:2]))             # "american express ..." -> "american express"
+    return list(dict.fromkeys(keys))
+
+
+ALIASES = {"GOOGL": ["google"], "GOOG": ["google"], "META": ["meta", "facebook", "instagram"], "BRK.B": ["berkshire"],
+           "PG": ["procter"], "JNJ": ["j&j", "johnson & johnson"], "KO": ["coca-cola", "coke"], "XOM": ["exxon"],
+           "BAC": ["bank of america", "bofa"], "WFC": ["wells fargo"], "JPM": ["jpmorgan", "jp morgan"], "HD": ["home depot"],
+           "UNH": ["unitedhealth"], "LLY": ["eli lilly", "lilly"], "MCD": ["mcdonald"], "TMO": ["thermo fisher"], "DE": ["deere"]}
+_ANALYST = re.compile(r"^(?:[A-Z][\w&.'-]*\s+){1,5}(?i:upgrades|downgrades|maintains|reiterates|initiates|resumes|raises price target|"
+                      r"lowers price target|cuts price target|boosts price target|assumes)\b")   # "Goldman Sachs Downgrades ..."
+
+
+def about(headline, symbol, name=""):
+    """True when the headline names the company (or its ticker). In "Goldman Sachs Downgrades
+    Eutelsat" only the part after the analyst's verb counts: it's about Eutelsat, not Goldman."""
+    h = headline or ""
+    m = _ANALYST.search(h)
+    if m:
+        h = h[m.end():]
+    sym = symbol.replace("/USD", "").replace("/", "")
+    if re.search(r"(?<![A-Za-z])\$?" + re.escape(sym) + r"(?![A-Za-z])", h) and (len(sym) >= 3 or re.search(
+            r"(\$" + re.escape(sym) + r"\b|\(" + re.escape(sym) + r"\)|:" + re.escape(sym) + r"\b)", h)):
+        return True                                   # "NVDA", "$T", "(NYSE:T)"
+    ck = (sym, name)
+    if ck not in _KEYS:
+        _KEYS[ck] = [re.compile(r"(?<![\w&])" + re.escape(k) + r"(?:'s|s)?(?![\w&])", re.I)
+                     for k in name_keys(name) + ALIASES.get(sym, [])]
+    return any(rx.search(h) for rx in _KEYS[ck])
+
+
 def word_alarm(st):
     """The word list's bad-news call on one story (not counting how fresh it is)."""
     return not st.get("roundup") and st["tone"] <= -STRONG and st.get("strength", -1) < 0

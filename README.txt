@@ -219,6 +219,14 @@ THE TEAM: TWO TRADERS AND THREE GUARDIANS (from version 1.5.11)
       any part of the account's change today the heroes' trades don't explain.
       A gap over $25 is logged as a WARNING.
 
+YOUR HOLDS: BUY SOMETHING AND KEEP IT UNTIL YOU SAY SELL (from version 1.5.18)
+  In bots.json a hero can carry "owner_holds", like  "owner_holds": {"XRP/USD": 100}.
+  The hero buys each one ONCE for that many dollars, then leaves it alone: no strategy sale,
+  no stop-loss, no guard order, no bad-news exit. Bram and Pip don't stop the buy.
+  It shows with a blue HOLD tag on the hero's card and doesn't count on the Scorecard.
+  To sell it: take it out of owner_holds (or just tell Claude "sell the XRP").
+  Gareth holds $100 of XRP for you this way (paper money, like everything else).
+
 THE WATCHDOG: ALERTS WHEN SOMETHING KEEPS GOING WRONG (from version 1.5.14)  -- watchdog.py
   The Watchdog reads Goldmire's log. When the same problem repeats (3 times within
   an hour for most; at once for Pip's daily stop or money Ysolde can't explain), a

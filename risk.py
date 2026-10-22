@@ -164,6 +164,8 @@ def _nasdaq_sector(symbol, log):
 def industry(symbol, log=print):
     """Broad industry for a stock symbol. Unknown ones come back as 'Unknown: <SYMBOL>'."""
     sym = symbol.upper()
+    if "/" in sym:
+        return "Crypto"
     if sym in FUNDS:
         return FUNDS[sym]
     found = _nasdaq_sector(sym, log)

@@ -56,7 +56,7 @@ def update(memory, bots, positions, spy_now, today, norm, pot_of, log=print):
         if b.get("role"):
             continue
         name = b["name"]
-        held = memory.get("held", {}).get(name, {})
+        held = {s: h for s, h in memory.get("held", {}).get(name, {}).items() if not h.get("hold")}   # your holds don't count
         unreal = sum(_f(getattr(positions.get(norm(s)), "unrealized_pl", 0)) for s in held if positions.get(norm(s)))
         pot = pot_of(b)
         st = starts.get(name)
@@ -66,7 +66,7 @@ def update(memory, bots, positions, spy_now, today, norm, pot_of, log=print):
             st = starts[name] = {"day": today, "strategy": b.get("strategy"), "pot": round(pot, 2),
                                  "unreal": round(unreal, 2), "spy": spy_now}
         trades = [e for e in memory.get("journal", []) if e.get("side") == "sell" and e.get("bot") == name
-                  and str(e.get("t", ""))[:10] >= st["day"]]
+                  and str(e.get("t", ""))[:10] >= st["day"] and "owner hold" not in str(e.get("reason", ""))]
         n = len(trades)
         wins = sum(1 for e in trades if _f(e.get("pl")) > 0)
         rets = [_f(e.get("pl")) / _f(e.get("cost")) for e in trades if _f(e.get("cost")) > 0]

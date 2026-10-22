@@ -194,6 +194,9 @@ SETTINGS_UPDATES = [
         "Crypto-1": {"role": "validator"},
         "Crypto-2": {"role": "execution"},
     }),
+    ("2026-10-22-xrp-hold", "you asked Gareth to buy $100 of XRP and hold it until you say sell", {
+        "Stock-1": {"owner_holds": {"XRP/USD": 100}},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [
@@ -298,6 +301,9 @@ def check_config(bots):
             problems.append(f"[{n}] needs at least one symbol in its watchlist (or turn research on)")
         if b.get("kind") == "crypto" and any("/" not in s for s in b["watchlist"]):
             problems.append(f"[{n}] crypto symbols look like BTC/USD")
+        oh = b.get("owner_holds") or {}
+        if not isinstance(oh, dict) or any(not isinstance(v, (int, float)) or v < 1 for v in oh.values()):
+            problems.append(f"[{n}] owner_holds looks like {{\"XRP/USD\": 100}} (symbol: dollars)")
     if problems:
         for p in problems:
             log.error("SETTINGS PROBLEM in bots.json: " + p)
@@ -669,7 +675,7 @@ def learned_strategy(bot, rnd, memory):
 def retire_coins(bot, rnd, memory):
     """A hero that moved from crypto to stocks sells the coins it still holds, once, by itself."""
     held = held_by(memory, bot)
-    for sym in [s for s in held if "/" in s]:
+    for sym in [s for s in held if "/" in s and not held[s].get("hold")]:
         if norm(sym) in rnd.positions:
             try:
                 place_sell(rnd.trading, bot, memory, sym, rnd.positions[norm(sym)], "(retired from crypto: now trades stocks)")
@@ -689,9 +695,65 @@ def retire_coins(bot, rnd, memory):
             save_memory(memory)
 
 
+def owner_holds(rnd, bots, memory):
+    """Your own orders, carried out by a hero: "owner_holds": {"XRP/USD": 100} in bots.json.
+
+    The hero buys each one once, for that many dollars, and then leaves it alone: no strategy
+    sells, no stop-loss, no guard order, no bad-news exit, and Bram and Pip don't stop the buy.
+    Take a symbol out of owner_holds (or tell Claude "sell the XRP") and the hero sells it."""
+    tries = memory.setdefault("owner_holds_tries", {})
+    for b in bots:
+        want = b.get("owner_holds") or {}
+        held = held_by(memory, b)
+        done = memory.setdefault("owner_holds_done", {}).setdefault(b["name"], [])
+        who = f"[{b['name']}]"
+        for sym, dollars in want.items():
+            sym = sym.upper()
+            if sym in held or sym in done:
+                continue
+            key = f"{b['name']}:{sym}"
+            if tries.get(key, 0) >= 3:
+                continue                               # said so already; fix it, then restart
+            if norm(sym) in rnd.positions or norm(sym) in rnd.open_orders:
+                log.info(f"{who} owner hold {sym}: the account already holds it outside this hero; not buying it twice")
+                done.append(sym)
+                save_memory(memory)
+                continue
+            if "/" not in sym and not rnd.market_open:
+                continue                               # a stock waits for the market to open
+            try:
+                kind = "crypto" if "/" in sym else "stock"
+                if place_buy(rnd, {**b, "kind": kind}, memory, sym, float(dollars)):
+                    held[sym]["hold"] = True
+                    done.append(sym)
+                    save_memory(memory)
+                    log.info(f"{who} OWNER HOLD {sym}: bought ${float(dollars):,.2f} for you; held until you say sell")
+            except Exception as e:  # noqa: BLE001
+                tries[key] = tries.get(key, 0) + 1
+                save_memory(memory)
+                log.error(f"{who} owner hold {sym}: the buy didn't go through ({e})"
+                          + ("; giving up until Goldmire restarts" if tries[key] >= 3 else "; trying again next round"))
+        for sym, h in list(held.items()):
+            if not h.get("hold") or sym in {k.upper() for k in want}:
+                continue
+            if "/" not in sym and not rnd.market_open:
+                continue
+            try:
+                if norm(sym) in rnd.positions:
+                    place_sell(rnd.trading, b, memory, sym, rnd.positions[norm(sym)], "(owner hold: you said sell)")
+                else:
+                    held.pop(sym, None)
+                    log.info(f"{who} owner hold {sym}: no longer in the account; forgotten")
+                    save_memory(memory)
+                done[:] = [x for x in done if x != sym]
+                save_memory(memory)
+            except Exception as e:  # noqa: BLE001
+                log.error(f"{who} owner hold {sym}: couldn't sell yet ({e})")
+
+
 def run_bot(bot, rnd, memory):
     name, kind = bot["name"], bot["kind"]
-    if kind != "crypto" and any("/" in s for s in held_by(memory, bot)):
+    if kind != "crypto" and any("/" in s and not h.get("hold") for s, h in held_by(memory, bot).items()):
         retire_coins(bot, rnd, memory)
     if kind != "crypto" and not rnd.market_open:
         log.info(f"[{name}] market closed, waiting")
@@ -706,6 +768,8 @@ def run_bot(bot, rnd, memory):
 
     # 1) Tidy up: forget buys that never filled (or positions you closed by hand)
     for sym in list(held):
+        if held[sym].get("hold"):
+            continue                                   # your hold: looked after by owner_holds()
         if norm(sym) not in rnd.positions and norm(sym) not in rnd.open_orders:
             fill = guards.filled(rnd.trading, held[sym])
             if fill:                                   # its protective stop sold it at Alpaca
@@ -729,7 +793,7 @@ def run_bot(bot, rnd, memory):
 
     # 2) Watch what we hold: bad news, stop-loss, "let it build" trailing stop, take-profit,
     #    or the style saying sell (see exits.py)
-    holding = [s for s in held if norm(s) in rnd.positions]
+    holding = [s for s in held if norm(s) in rnd.positions and not held[s].get("hold")]
     closes = fetch_bars(holding) if strategy is None else rnd.closes(holding, kind)
     stop_setting = bot.get("stop_loss", exits.DEFAULT_STOP)
     exit_mode = bot.get("exit", exits.DEFAULT_EXIT)
@@ -910,7 +974,8 @@ def build_status(positions, memory, market_open, bots):
             p = positions.get(norm(sym))
             e = DESK[0].earnings_for(sym) if DESK else None
             pos_list.append({"symbol": sym, "cost": h["cost"], "pl": round(float(p.unrealized_pl), 2) if p else 0.0,
-                             "pending": p is None, "earnings": e and {"date": e["date"], "when": e["when"]}})
+                             "pending": p is None, "earnings": e and {"date": e["date"], "when": e["when"]},
+                             "hold": bool(h.get("hold"))})
         realized = round(memory["realized"].get(b["name"], 0.0), 2)
         unrealized = round(sum(p["pl"] for p in pos_list), 2)
         out.append({
@@ -1567,6 +1632,10 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
             DESK[0].refresh(report.ny().date(), log.info)
         if rnd:
             game.MARKET_OPEN = rnd.market_open
+            try:
+                owner_holds(rnd, bots, memory)
+            except Exception as e:  # noqa: BLE001
+                log.error(f"owner holds: problem this round -> {e}")
             for bot in bots:
                 try:
                     run_bot(bot, rnd, memory)

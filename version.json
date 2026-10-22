@@ -1,6 +1,6 @@
 {
-  "version": "1.5.19",
+  "version": "1.5.20",
   "notes": [
-    "Gareth adds $200 more XRP for you: $300 in all, held until you say sell."
+    "Gareth moves your $300 from XRP into XRPN (Evernorth): buys XRPN first, then sells the XRP. Still held until you say sell."
   ]
 }

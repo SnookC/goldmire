@@ -200,6 +200,9 @@ SETTINGS_UPDATES = [
     ("2026-10-22-xrp-300", "you asked for $200 more XRP: Gareth's XRP hold goes to $300 in all", {
         "Stock-1": {"owner_holds": {"XRP/USD": 300}},
     }),
+    ("2026-10-22-xrpn", "you asked to move the $300 from XRP into XRPN (Evernorth): Gareth buys XRPN, then sells the XRP", {
+        "Stock-1": {"owner_holds": {"XRPN": 300}},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [
@@ -710,6 +713,7 @@ def owner_holds(rnd, bots, memory):
         held = held_by(memory, b)
         done = memory.setdefault("owner_holds_done", {}).setdefault(b["name"], [])
         who = f"[{b['name']}]"
+        waiting = set()                                # a wanted buy still to happen: hold off on sales
         for sym, dollars in want.items():
             sym, dollars = sym.upper(), float(dollars)
             h = held.get(sym)
@@ -722,6 +726,7 @@ def owner_holds(rnd, bots, memory):
             if extra < 1:
                 continue                               # already holds what you asked for
             key = f"{b['name']}:{sym}:{dollars:g}"
+            waiting.add(sym)
             if tries.get(key, 0) >= 3:
                 continue                               # said so already; fix it, then restart
             if h is None and (norm(sym) in rnd.positions or norm(sym) in rnd.open_orders):
@@ -733,21 +738,33 @@ def owner_holds(rnd, bots, memory):
                 continue                               # a stock waits for the market to open
             try:
                 kind = "crypto" if "/" in sym else "stock"
-                if place_buy(rnd, {**b, "kind": kind}, memory, sym, extra):
+                price = None
+                if kind == "stock":                    # in case it can't be bought in fractions
+                    try:
+                        from alpaca.data.requests import StockLatestTradeRequest
+                        from alpaca.data.enums import DataFeed
+                        price = float(rnd.stock_data.get_stock_latest_trade(
+                            StockLatestTradeRequest(symbol_or_symbols=sym, feed=DataFeed.IEX))[sym].price)
+                    except Exception as e:  # noqa: BLE001
+                        log.info(f"{who} owner hold {sym}: couldn't read its price ({e})")
+                if place_buy(rnd, {**b, "kind": kind}, memory, sym, extra, price):
                     nh = held[sym]
                     if h:                              # adding to the hold: one entry, total cost
-                        nh.update({"cost": round(have + extra, 2), "opened": h.get("opened", nh["opened"])})
+                        nh.update({"cost": round(have + nh["cost"], 2), "opened": h.get("opened", nh["opened"])})
                     nh["hold"] = True
                     if sym not in done:
                         done.append(sym)
                     save_memory(memory)
-                    log.info(f"{who} OWNER HOLD {sym}: bought ${extra:,.2f} for you"
-                             + (f" (now ${have + extra:,.2f} in all)" if h else "") + "; held until you say sell")
+                    waiting.discard(sym)
+                    log.info(f"{who} OWNER HOLD {sym}: bought ${nh['cost'] - have:,.2f} for you"
+                             + (f" (now ${nh['cost']:,.2f} in all)" if h else "") + "; held until you say sell")
             except Exception as e:  # noqa: BLE001
                 tries[key] = tries.get(key, 0) + 1
                 save_memory(memory)
                 log.error(f"{who} owner hold {sym}: the buy didn't go through ({e})"
                           + ("; giving up until Goldmire restarts" if tries[key] >= 3 else "; trying again next round"))
+        if waiting:                                    # e.g. swapping XRP for XRPN: sell only once the buy is done
+            continue
         for sym, h in list(held.items()):
             if not h.get("hold") or sym in {k.upper() for k in want}:
                 continue

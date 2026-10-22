@@ -226,7 +226,8 @@ YOUR HOLDS: BUY SOMETHING AND KEEP IT UNTIL YOU SAY SELL (from version 1.5.18)
   It shows with a blue HOLD tag on the hero's card and doesn't count on the Scorecard.
   To sell it: take it out of owner_holds (or just tell Claude "sell the XRP").
   Raise the number to add more (it buys only the difference).
-  Gareth holds $300 of XRP for you this way (paper money, like everything else).
+  Swap one for another and the hero buys the new one first, then sells the old.
+  Gareth holds $300 of XRPN (Evernorth) for you this way (paper money, like everything else).
 
 THE WATCHDOG: ALERTS WHEN SOMETHING KEEPS GOING WRONG (from version 1.5.14)  -- watchdog.py
   The Watchdog reads Goldmire's log. When the same problem repeats (3 times within

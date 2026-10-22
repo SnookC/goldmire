@@ -1,6 +1,6 @@
 {
-  "version": "1.5.23",
+  "version": "1.5.24",
   "notes": [
-    "The news replay also tests an 'is this story really about this stock?' check: a bad-news sale only when the headline names the company. It runs by itself in a few minutes; nothing changes in trading until you OK it."
+    "The news replay runs as soon as a new test is added (it only waits after a failure)."
   ]
 }

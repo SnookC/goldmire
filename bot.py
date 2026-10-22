@@ -1517,9 +1517,8 @@ def maybe_news_replay(memory):
     """Once FinBERT is ready: the replay test, in the background, now and then once a week."""
     if not REPLAY or REPLAY[2] or not finbert.ready() or not news_replay.due():
         return
-    if memory.get("news_replay_tried", "") > (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat():
+    if memory.get("news_replay_failed", "") > (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat():
         return                                  # failed recently: wait a while before trying again
-    memory["news_replay_tried"] = datetime.now(timezone.utc).isoformat()
     REPLAY[2] = True
     extra = [s for h in memory.get("held", {}).values() for s in h]
 
@@ -1528,7 +1527,8 @@ def maybe_news_replay(memory):
             names = {a.symbol: a.name for a in research.us_equities(REPLAY[3])}
             news_replay.run(REPLAY[0], REPLAY[1], lambda m: log.info(m), extra=extra, names=names)
         except Exception as e:  # noqa: BLE001
-            log.info(f"News replay: didn't finish ({e}); trying again later")
+            memory["news_replay_failed"] = datetime.now(timezone.utc).isoformat()
+            log.info(f"News replay: didn't finish ({e}); trying again in 6 hours")
         finally:
             REPLAY[2] = False
     threading.Thread(target=work, daemon=True, name="news-replay").start()

@@ -1,7 +1,7 @@
 {
-  "version": "1.5.21",
+  "version": "1.5.22",
   "notes": [
-    "FinBERT, an AI news reader from Hugging Face, now reads every headline next to the word list, in shadow: it decides nothing yet. It installs itself the first time (a few minutes, in the background).",
-    "A replay test on the last 60 days of real headlines checks whose bad-news calls were right. Report: proving_grounds/news_replay.html"
+    "Quieter log: FinBERT's download messages no longer show up.",
+    "The Scorecard leaves out your holds' sales too (the XRP swap no longer counts against Gareth)."
   ]
 }

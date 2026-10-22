@@ -65,10 +65,20 @@ def _load(log, on_ready):
         os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
         os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
         import logging
-        for name in ("httpx", "huggingface_hub", "transformers", "urllib3"):
+        for name in ("httpx", "httpx2", "huggingface_hub", "transformers", "urllib3"):
             logging.getLogger(name).setLevel(logging.WARNING)   # keep their chatter out of Goldmire's log
         log("FinBERT: loading the model (the first time it downloads about 440 MB)")
         from transformers import pipeline
+        try:
+            from huggingface_hub.utils import disable_progress_bars
+            disable_progress_bars()
+        except Exception:  # noqa: BLE001
+            pass
+        for name in ("httpx", "httpx2", "httpcore", "huggingface_hub", "transformers", "urllib3"):
+            logging.getLogger(name).setLevel(logging.WARNING)   # (again: importing them can reset it)
+            logging.getLogger(name).propagate = False
+        import warnings
+        warnings.filterwarnings("ignore", message=".*unauthenticated requests.*")
         pipe = pipeline("text-classification", model=MODEL, top_k=None, device=-1)
         pipe(["Company beats estimates"])                       # warm up
         _state["pipe"], _state["ready"] = pipe, True

@@ -70,7 +70,9 @@ def update(memory, bots, positions, spy_now, today, norm, pot_of, log=print):
         n = len(trades)
         wins = sum(1 for e in trades if _f(e.get("pl")) > 0)
         rets = [_f(e.get("pl")) / _f(e.get("cost")) for e in trades if _f(e.get("cost")) > 0]
-        result = round((pot - st["pot"]) + (unreal - st["unreal"]), 2)
+        yours = sum(_f(e.get("pl")) for e in memory.get("journal", []) if e.get("side") == "sell" and e.get("bot") == name
+                    and str(e.get("t", ""))[:10] >= st["day"] and "owner hold" in str(e.get("reason", "")))
+        result = round((pot - st["pot"]) + (unreal - st["unreal"]) - yours, 2)      # your holds' sales aren't the trader's
         spy_ret = (spy_now / st["spy"] - 1) if spy_now and st.get("spy") else None
         tested = _tested(b.get("strategy"))
         live_win = wins / n if n else None

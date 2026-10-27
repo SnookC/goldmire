@@ -1,6 +1,7 @@
 {
   "version": "1.5.28",
   "notes": [
-    "New background test: volume candles vs normal daily candles for Wren's Bollinger bounce and the candle patterns (60 stocks, 3 years of minute prices)."
+    "New background test: volume candles vs normal daily candles for Wren's Bollinger bounce and the candle patterns (60 stocks, 3 years of minute prices).",
+    "Fix: the 300-stock test now loads the S&P 500 for the two market-weather ideas (they made no trades before) and reruns them."
   ]
 }

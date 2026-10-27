@@ -40,7 +40,10 @@ def universe():
 def due(big=False):
     try:
         with open(BIG_STATE if big else STATE, encoding="utf-8") as f:
-            return json.load(f).get("ideas") != IDEAS
+            st = json.load(f)
+        if big and st.get("fixed") != 1:
+            return True                     # 1.5.27's run never loaded the S&P 500 (weather ideas made 0 trades)
+        return st.get("ideas") != IDEAS
     except (OSError, ValueError):
         return True
 
@@ -86,7 +89,7 @@ def run_big(log=print):
     keys = IDEAS + [REFERENCE]
     strategies = [backtest.load_strategy_file(os.path.join(HERE, "strategies", k + ".py")) for k in keys]
     if any(st.needs_market for st in strategies):
-        spy = backtest.fetch_history("stock", "1Day", log, symbols=["SPY"], tag="_mkt", days=BIG_YEARS * 365 + 400)
+        spy = backtest.fetch_history("stock", "1Day", log, symbols=["SPY"], tag="_mkt", days=BIG_YEARS * 365 + 400).get("SPY") or {}
         backtest.MARKET["d"], backtest.MARKET["c"] = [str(x)[:10] for x in spy.get("t", [])], list(spy.get("c", []))
     syms = universe()
     log(f"Lab (300 stocks, {BIG_YEARS} years): testing {len(keys)} strategies; downloading prices first")
@@ -99,7 +102,7 @@ def run_big(log=print):
                         "exam_pl": r["exam_pl"], "beats_random": r.get("beats_random"), "breadth": r.get("breadth"),
                         "profit_factor": r.get("profit_factor"), "buy_and_hold": r.get("buy_and_hold")})
     with open(BIG_STATE, "w", encoding="utf-8") as f:
-        json.dump({"ideas": IDEAS, "run": datetime.now().isoformat(timespec="seconds"), "stocks": len(data),
+        json.dump({"ideas": IDEAS, "fixed": 1, "run": datetime.now().isoformat(timespec="seconds"), "stocks": len(data),
                    "years": BIG_YEARS, "summary": summary}, f, indent=1)
     for s in summary:
         log(f"Lab result (300 stocks): {s['name']}: {s['verdict']}")

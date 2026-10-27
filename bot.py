@@ -45,6 +45,7 @@ import scorecard
 import finbert
 import news_replay
 import news_exit_test
+import lab
 
 # ---------------------------------------------------------------------------
 # SETTINGS  (bots themselves are in bots.json)
@@ -1516,7 +1517,8 @@ REPLAY = []    # [news client, stock data client, running?]
 
 def maybe_news_replay(memory):
     """Once FinBERT is ready: the replay test, in the background, now and then once a week."""
-    if not REPLAY or REPLAY[2] or not finbert.ready() or not (news_replay.due() or news_exit_test.due()):
+    replay_due = finbert.ready() and news_replay.due()
+    if not REPLAY or REPLAY[2] or not (replay_due or news_exit_test.due() or lab.due()):
         return
     if memory.get("news_replay_failed", "") > (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat():
         return                                  # failed recently: wait a while before trying again
@@ -1524,15 +1526,22 @@ def maybe_news_replay(memory):
     extra = [s for h in memory.get("held", {}).values() for s in h]
 
     def work():
+        failed = False
+        steps = [("News replay", lambda: news_replay.run(REPLAY[0], REPLAY[1], lambda m: log.info(m), extra=extra,
+                                                         names={a.symbol: a.name for a in research.us_equities(REPLAY[3])}), replay_due),
+                 ("Headline-selling test", lambda: news_exit_test.run(REPLAY[0], lambda m: log.info(m)), news_exit_test.due()),
+                 ("Lab", lambda: lab.run(lambda m: log.info(m)), lab.due())]
         try:
-            if news_replay.due():
-                names = {a.symbol: a.name for a in research.us_equities(REPLAY[3])}
-                news_replay.run(REPLAY[0], REPLAY[1], lambda m: log.info(m), extra=extra, names=names)
-            if news_exit_test.due():
-                news_exit_test.run(REPLAY[0], lambda m: log.info(m))
-        except Exception as e:  # noqa: BLE001
-            memory["news_replay_failed"] = datetime.now(timezone.utc).isoformat()
-            log.info(f"News replay: didn't finish ({e}); trying again in 6 hours")
+            for name, go, due in steps:            # each test on its own: one failing doesn't stop the others
+                if not due:
+                    continue
+                try:
+                    go()
+                except Exception as e:  # noqa: BLE001
+                    failed = True
+                    log.info(f"{name}: didn't finish ({e}); trying again in 6 hours")
+            if failed:
+                memory["news_replay_failed"] = datetime.now(timezone.utc).isoformat()
         finally:
             REPLAY[2] = False
     threading.Thread(target=work, daemon=True, name="news-replay").start()

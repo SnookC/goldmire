@@ -1,6 +1,7 @@
 {
-  "version": "1.5.25",
+  "version": "1.5.26",
   "notes": [
-    "New test, runs by itself in the background: does selling on bad-news headlines help Wren, or should her Bollinger rules decide every exit? Real headlines and prices from the last year."
+    "The Lab: tests new strategy ideas in the background without touching the main results. First batch: candlestick patterns (hammer, bullish engulfing, morning star, and Wren's Bollinger bounce confirmed by a candle) plus the two market-weather ideas, on 12 and 60 stocks.",
+    "The headline-selling test for Wren keeps running too."
   ]
 }

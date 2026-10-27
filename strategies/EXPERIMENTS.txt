@@ -31,3 +31,23 @@ Round 4  (written Oct 20 2026, before testing): the MARKET WEATHER check
   8. Bollinger bounce (fair weather), for Wren. To replace her plain version it must PASS,
      pass again on the 60-stock list, AND beat plain Bollinger bounce on both.
   9. 12-1 momentum (fair weather), for Gareth. Must PASS, then pass on the 60-stock list.
+
+Round 4 was written down but never run. It runs now with round 5, in the Lab (lab.py), which
+tests each idea on the 12-stock list AND the 60-stock wide list and never touches results.json.
+
+Round 5  (written Oct 27 2026, before testing): CANDLESTICK PATTERNS
+  Classic reversal candles (Steve Nison's definitions, made exact in _candles.py), each only
+  after a short decline (close below its 10-day average) and only in an uptrend (above the
+  200-day average). Buy the next open; sell when the close is back above the 20-day average,
+  or after 10 days.
+  10. Hammer reversal ............ for Gareth
+  11. Bullish engulfing .......... for Gareth
+  12. Morning star ............... for Gareth
+  13. Bollinger bounce + candle .. for Wren: her rule, but buy only when a hammer or bullish
+      engulfing candle shows up at the lower band.
+  Rules: an idea for Gareth must PASS on the 12 stocks AND on the 60. An idea for Wren must
+  PASS on both AND make more than plain Bollinger bounce on both (re-run on the same prices).
+  Same for round 4's #8 (Wren) and #9 (Gareth).
+
+Total ideas tried so far: 13 (11 for Gareth). With this many tries, one passing by luck is
+a real possibility: a pass is a reason to trade it on paper, not proof.

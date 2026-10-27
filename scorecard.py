@@ -53,7 +53,7 @@ def update(memory, bots, positions, spy_now, today, norm, pot_of, log=print):
     starts = memory.setdefault("score_start", {})
     out = []
     for b in bots:
-        if b.get("role"):
+        if b.get("role") or b.get("retired"):
             continue
         name = b["name"]
         held = {s: h for s, h in memory.get("held", {}).get(name, {}).items() if not h.get("hold")}   # your holds don't count

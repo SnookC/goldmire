@@ -212,6 +212,9 @@ SETTINGS_UPDATES = [
      "no good-news hold; and fewer, bigger trades (8 at once, each risking 1.5% of her pot instead of 0.75%)", {
         "Stock-2": {"news_exit": False, "news_hold": False, "max_positions": 8, "risk": 0.015},
     }),
+    ("2026-10-27-gareth-retires", "Gareth retires once your XRPN is sold: his pot then goes to Wren", {
+        "Stock-1": {"retire_to": "Stock-2"},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [
@@ -792,6 +795,33 @@ def owner_holds(rnd, bots, memory):
                 log.error(f"{who} owner hold {sym}: couldn't sell yet ({e})")
 
 
+def retire_heroes(bots, memory):
+    """"retire_to": "Stock-2" in bots.json: once this hero holds nothing (and has no holds of
+    yours left), its whole pot moves to that hero and it retires for good (benched, hidden from
+    the town's hero list). Pot rules still apply: anything over the receiver's limit goes to savings."""
+    names = {b["name"]: b for b in bots}
+    for b in bots:
+        to = names.get(b.get("retire_to") or "")
+        if not to or b.get("retired") or held_by(memory, b) or b.get("owner_holds"):
+            continue
+        src, dst = bank._acct(memory, b), bank._acct(memory, to)
+        amount = round(src["pot"], 2)
+        limit = bank.TIERS[dst["tier"]]["limit"]
+        dst["pot"] = round(dst["pot"] + amount, 2)
+        extra = round(max(0.0, dst["pot"] - limit), 2)
+        if extra:
+            dst["pot"] = float(limit)
+            dst["savings"] = round(dst["savings"] + extra, 2)
+        src["pot"] = 0.0
+        b["retired"], b["benched"] = True, True
+        for k, v in (("retired", True), ("benched", True)):
+            _save_bot_field(b["name"], k, v)
+        save_memory(memory)
+        log.info(f"[{b['name']}] RETIRED: {b.get('hero', b['name'])} hands his ${amount:,.2f} pot to "
+                 f"{to.get('hero', to['name'])} (her pot is now ${dst['pot']:,.2f}"
+                 + (f"; ${extra:,.2f} over her ${limit:,} limit went to savings" if extra else "") + ")")
+
+
 def run_bot(bot, rnd, memory):
     name, kind = bot["name"], bot["kind"]
     if kind != "crypto" and any("/" in s and not h.get("hold") for s, h in held_by(memory, bot).items()):
@@ -1021,7 +1051,7 @@ def build_status(positions, memory, market_open, bots):
         unrealized = round(sum(p["pl"] for p in pos_list), 2)
         out.append({
             "name": b["name"], "kind": b["kind"], "strategy": b["strategy"], "benched": bool(b.get("benched")),
-            "role": b.get("role"), "verdict": memory.get("validation", {}).get(b["name"], {}).get("verdict"),
+            "role": b.get("role"), "retired": bool(b.get("retired")), "verdict": memory.get("validation", {}).get(b["name"], {}).get("verdict"),
             "strategy_name": STRATEGY_NAMES[b["strategy"]], "watchlist": [] if research.scan_size(b) else wl,
             "scan": research.scan_size(b), "scanning": len(wl) if research.scan_size(b) else 0,
             "pinned": list(b.get("pinned", [])),
@@ -1764,6 +1794,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
             game.MARKET_OPEN = rnd.market_open
             try:
                 owner_holds(rnd, bots, memory)
+                retire_heroes(bots, memory)
             except Exception as e:  # noqa: BLE001
                 log.error(f"owner holds: problem this round -> {e}")
             for bot in bots:

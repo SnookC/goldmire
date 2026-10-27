@@ -1,8 +1,6 @@
 {
-  "version": "1.5.28",
+  "version": "1.5.29",
   "notes": [
-    "Both MACD strategies join every test: 12, 60 and 300 stocks, and volume candles.",
-    "New background test: volume candles vs normal daily candles for Wren's Bollinger bounce and the candle patterns (60 stocks, 3 years of minute prices).",
-    "Fix: the 300-stock test now loads the S&P 500 for the two market-weather ideas (they made no trades before) and reruns them."
+    "Gareth retires once your XRPN is sold: his whole pot moves to Wren and he leaves the hero list. Nothing changes until you say sell."
   ]
 }

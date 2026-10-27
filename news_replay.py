@@ -115,6 +115,8 @@ def fetch_stories(news_client, symbols, start, end, log, max_stories=MAX_STORIES
                 out.append({"id": nid, "headline": head, "time": news._aware(when).isoformat(), "symbols": syms,
                             "tone": tone, "strength": strength, "roundup": len(syms) > news.ROUNDUP})
         t = t2
+        if (end - start).days > 400 and t.month != (t - timedelta(days=7)).month and t.month in (1, 7):
+            log(f"    ...news up to {t:%b %Y}: {len(out)} stories so far")
     return out
 
 

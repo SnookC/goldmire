@@ -33,8 +33,8 @@ KEEP_MARGIN = 0.05
 STRATEGY = "bollinger_bounce"
 
 
-def due():
-    return not os.path.exists(OUT_JSON)
+def due(out=None):
+    return not os.path.exists(out or OUT_JSON)
 
 
 def _stats(trades, cut):
@@ -47,9 +47,13 @@ def _stats(trades, cut):
             "news_sales": sum(1 for t in trades if t["why"] == "bad news")}
 
 
-def run(news_client, log=print, days=DAYS):
+def run(news_client, log=print, days=DAYS, symbols=None, out=None, label="60 stocks"):
+    out = out or OUT_JSON
     st = backtest.load_strategy_file(os.path.join(HERE, "strategies", STRATEGY + ".py"))
-    data = backtest.fetch_history("stock", "1Day", log, symbols=backtest.WIDE_BASKET, tag="wide")
+    if symbols:
+        data = backtest.fetch_history("stock", "1Day", log, symbols=symbols, tag="300", days=days + WARMUP_DAYS + 30)
+    else:
+        data = backtest.fetch_history("stock", "1Day", log, symbols=backtest.WIDE_BASKET, tag="wide")
     end = datetime.now(timezone.utc) - timedelta(minutes=20)
     start = end - timedelta(days=days)
     keep_from = (start - timedelta(days=WARMUP_DAYS)).isoformat()
@@ -60,9 +64,10 @@ def run(news_client, log=print, days=DAYS):
         if len(data[sym]["c"]) < 60:
             data.pop(sym)
     syms = list(data)
-    log(f"Headline-selling test: downloading {days} days of news for {len(syms)} stocks (this takes a while)")
-    stories = news_replay.fetch_stories(news_client, syms, start, end, log, max_stories=200000)
+    log(f"Headline-selling test ({label}): downloading {days} days of news for {len(syms)} stocks (this takes a while)")
+    stories = news_replay.fetch_stories(news_client, syms, start, end, log, max_stories=2000000)
     alarms = {}
+    n_stories = len(stories)
     for s in stories:
         if news.word_alarm(s):
             t = datetime.fromisoformat(s["time"]).timestamp()
@@ -71,6 +76,7 @@ def run(news_client, log=print, days=DAYS):
                     alarms.setdefault(sym, []).append(t)
     for v in alarms.values():
         v.sort()
+    stories = None                                           # (a lot of headlines: free the memory)
     a_tr, b_tr = [], []
     start_s = start.isoformat()
     for sym, ser in data.items():
@@ -85,12 +91,12 @@ def run(news_client, log=print, days=DAYS):
            f"with headline selling: {backtest._money(B['pl'])} on {B['trades']} trades, {B['news_sales']} of them sold on news "
            f"(exam {backtest._money(B['exam_pl'])}), $100 a trade")
     result = {"run": datetime.now(timezone.utc).isoformat(timespec="seconds"), "days": days, "stocks": len(syms),
-              "stories": len(stories), "alarms": sum(len(v) for v in alarms.values()), "rules_only": A,
+              "stories": n_stories, "alarms": sum(len(v) for v in alarms.values()), "rules_only": A,
               "with_headlines": B, "verdict": verdict, "why": why, "keep_margin": KEEP_MARGIN}
-    os.makedirs(os.path.dirname(OUT_JSON), exist_ok=True)
-    with open(OUT_JSON, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=1)
-    log(f"Headline-selling test: {verdict}. {why}")
+    log(f"Headline-selling test ({label}): {verdict}. {why}")
     return result
 
 

@@ -1516,13 +1516,15 @@ def watch_news(news_client, bots, memory):
     save_memory(memory)
 
 
-REPLAY = []    # [news client, stock data client, running?]
+REPLAY = []    # [news client, stock data client, running?, trading client]
+NEWS_EXIT_300 = os.path.join(HERE, "proving_grounds", "news_exit_test_300.json")
 
 
 def maybe_news_replay(memory):
     """Once FinBERT is ready: the replay test, in the background, now and then once a week."""
     replay_due = finbert.ready() and news_replay.due()
-    if not REPLAY or REPLAY[2] or not (replay_due or news_exit_test.due() or lab.due()):
+    if not REPLAY or REPLAY[2] or not (replay_due or news_exit_test.due() or lab.due() or lab.due(big=True)
+                                       or news_exit_test.due(NEWS_EXIT_300)):
         return
     if memory.get("news_replay_failed", "") > (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat():
         return                                  # failed recently: wait a while before trying again
@@ -1534,7 +1536,11 @@ def maybe_news_replay(memory):
         steps = [("News replay", lambda: news_replay.run(REPLAY[0], REPLAY[1], lambda m: log.info(m), extra=extra,
                                                          names={a.symbol: a.name for a in research.us_equities(REPLAY[3])}), replay_due),
                  ("Headline-selling test", lambda: news_exit_test.run(REPLAY[0], lambda m: log.info(m)), news_exit_test.due()),
-                 ("Lab", lambda: lab.run(lambda m: log.info(m)), lab.due())]
+                 ("Lab", lambda: lab.run(lambda m: log.info(m)), lab.due()),
+                 ("Lab (300 stocks)", lambda: lab.run_big(lambda m: log.info(m)), lab.due(big=True)),
+                 ("Headline-selling test (300 stocks)", lambda: news_exit_test.run(
+                     REPLAY[0], lambda m: log.info(m), days=lab.BIG_YEARS * 365, symbols=lab.universe(), out=NEWS_EXIT_300,
+                     label=f"300 stocks, {lab.BIG_YEARS} years"), news_exit_test.due(NEWS_EXIT_300))]
         try:
             for name, go, due in steps:            # each test on its own: one failing doesn't stop the others
                 if not due:

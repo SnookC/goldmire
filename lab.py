@@ -26,11 +26,20 @@ IDEAS = ["bollinger_bounce_weather", "momentum_weather",                        
 FOR_WREN = {"bollinger_bounce_weather", "bollinger_bounce_candle"}
 REFERENCE = "bollinger_bounce"
 STATE = os.path.join(OUT_DIR, "lab_state.json")
+BIG_STATE = os.path.join(OUT_DIR, "lab_state_300.json")
+BIG_YEARS = 5
+UNIVERSE = os.path.join(HERE, "universe_300.json")
 
 
-def due():
+def universe():
+    """The fixed list of the 300 largest US companies (made Oct 27 2026)."""
+    with open(UNIVERSE, encoding="utf-8") as f:
+        return [s["symbol"] for s in json.load(f)["stocks"]]
+
+
+def due(big=False):
     try:
-        with open(STATE, encoding="utf-8") as f:
+        with open(BIG_STATE if big else STATE, encoding="utf-8") as f:
             return json.load(f).get("ideas") != IDEAS
     except (OSError, ValueError):
         return True
@@ -68,6 +77,33 @@ def _run_one(label, data, strategies, best, suffix, log):
     with open(os.path.join(OUT_DIR, f"report_lab{suffix}.html"), "w", encoding="utf-8") as f:
         f.write(backtest.render_html(report))
     return {r["key"]: r for r in results}
+
+
+def run_big(log=print):
+    """Round 6: every idea, and Wren's plain Bollinger bounce, on the 300 largest US companies
+    over the last BIG_YEARS years (25 times the 12-stock test). Results: results_lab_300.json."""
+    os.makedirs(OUT_DIR, exist_ok=True)
+    keys = IDEAS + [REFERENCE]
+    strategies = [backtest.load_strategy_file(os.path.join(HERE, "strategies", k + ".py")) for k in keys]
+    if any(st.needs_market for st in strategies):
+        spy = backtest.fetch_history("stock", "1Day", log, symbols=["SPY"], tag="_mkt", days=BIG_YEARS * 365 + 400)
+        backtest.MARKET["d"], backtest.MARKET["c"] = [str(x)[:10] for x in spy.get("t", [])], list(spy.get("c", []))
+    syms = universe()
+    log(f"Lab (300 stocks, {BIG_YEARS} years): testing {len(keys)} strategies; downloading prices first")
+    data = backtest.fetch_history("stock", "1Day", log, symbols=syms, tag="300", days=BIG_YEARS * 365 + 350)
+    res = _run_one("300 stocks", data, strategies, _best_builtin(""), "_300", log)
+    summary = []
+    for k in keys:
+        r = res[k]
+        summary.append({"key": k, "name": r["name"], "verdict": r["verdict"], "trades": r["trades"], "pl": r["pl"],
+                        "exam_pl": r["exam_pl"], "beats_random": r.get("beats_random"), "breadth": r.get("breadth"),
+                        "profit_factor": r.get("profit_factor"), "buy_and_hold": r.get("buy_and_hold")})
+    with open(BIG_STATE, "w", encoding="utf-8") as f:
+        json.dump({"ideas": IDEAS, "run": datetime.now().isoformat(timespec="seconds"), "stocks": len(data),
+                   "years": BIG_YEARS, "summary": summary}, f, indent=1)
+    for s in summary:
+        log(f"Lab result (300 stocks): {s['name']}: {s['verdict']}")
+    return summary
 
 
 def run(log=print):

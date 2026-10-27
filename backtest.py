@@ -224,7 +224,7 @@ def _cache_path(market, tf, tag=""):
     return os.path.join(DATA_DIR, f"{market}{tag}_{tf}.json")
 
 
-def fetch_history(market, tf, log=print, symbols=None, tag=""):
+def fetch_history(market, tf, log=print, symbols=None, tag="", days=None):
     """{symbol: {"t": [...], "o": [...], "h": [...], "l": [...], "c": [...], "v": [...]}}"""
     path = _cache_path(market, tf, tag)
     if os.path.exists(path) and time.time() - os.path.getmtime(path) < DATA_MAX_AGE_HOURS * 3600:
@@ -235,11 +235,12 @@ def fetch_history(market, tf, log=print, symbols=None, tag=""):
     from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
     from alpaca.data.enums import DataFeed
     frame = {"15Min": TimeFrame(15, TimeFrameUnit.Minute), "1Hour": TimeFrame.Hour, "1Day": TimeFrame.Day}[tf]
-    start = datetime.now(timezone.utc) - timedelta(days=HISTORY_DAYS[tf])
+    days = days or HISTORY_DAYS[tf]
+    start = datetime.now(timezone.utc) - timedelta(days=days)
     end = datetime.now(timezone.utc) - timedelta(minutes=20)     # free data plans can't see the last 15 minutes
     key, secret = _keys()
     syms = list(symbols) if symbols else penny_basket(key, secret, log) if market == "penny" else BASKET[market]
-    log(f"Downloading {HISTORY_DAYS[tf]} days of {tf} {market} prices for {len(syms)} symbols...")
+    log(f"Downloading {days} days of {tf} {market} prices for {len(syms)} symbols...")
     if market in ("stock", "penny"):
         bars = StockHistoricalDataClient(key, secret).get_stock_bars(
             StockBarsRequest(symbol_or_symbols=syms, timeframe=frame, start=start, end=end, feed=DataFeed.IEX))

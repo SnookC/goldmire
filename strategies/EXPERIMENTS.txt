@@ -69,3 +69,19 @@ Headline selling (Oct 27 2026, news_exit_test.py, Wren's Bollinger bounce, 60 st
 every real headline): her rules alone +$85.45 (129 trades), with headline selling +$60.10
 (143 trades, 57 sold on news). Rule: keep only if 5% better AND better in the exam. It wasn't:
 Wren stops selling on headlines (1.5.26).
+
+Round 6  (written Oct 27 2026, before testing): THE BIG TEST
+  Every idea from rounds 4 and 5, and Wren's plain Bollinger bounce, on the 300 largest US
+  companies (universe_300.json, a fixed list made today from Nasdaq's screener) over the last
+  5 years of daily prices: 25 times the 12-stock test. Same Proving Grounds rules (a pass needs
+  50+ trades, profit factor 1.25, profitable on 60% of the stocks, and beating 95% of random
+  traders, in the exam too). Plus the headline-selling test on the same 300 stocks, 5 years.
+  Rules:
+  * Wren keeps plain Bollinger bounce if it PASSES or is PROMISING here. If it FAILS, Claude
+    tells you and Wren is put to Bram (she'd be blocked like Gareth unless you approve her).
+  * Gareth may trade an idea (plain Bollinger bounce included) only if it PASSES here.
+  * The round 4/5 ideas for Wren replace plain Bollinger only if they PASS here AND make more.
+  * Headline selling comes back for Wren only if it beats her rules alone by 5% AND in the exam.
+  Caveat written now: today's 300 biggest companies are the ones that did well (they got big),
+  so every strategy and the random traders look better than they would have in real time.
+  The random-trader comparison is fair (they get the same stocks); the dollar totals are flattering.

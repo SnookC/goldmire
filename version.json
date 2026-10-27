@@ -1,6 +1,6 @@
 {
-  "version": "1.5.27",
+  "version": "1.5.28",
   "notes": [
-    "The big test, in the background: every strategy idea and Wren's Bollinger bounce on the 300 largest US companies over 5 years, plus the headline-selling test on the same 300 stocks. The news download is large: allow an hour or two."
+    "New background test: volume candles vs normal daily candles for Wren's Bollinger bounce and the candle patterns (60 stocks, 3 years of minute prices)."
   ]
 }

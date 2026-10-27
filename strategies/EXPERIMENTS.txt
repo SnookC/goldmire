@@ -85,3 +85,11 @@ Round 6  (written Oct 27 2026, before testing): THE BIG TEST
   Caveat written now: today's 300 biggest companies are the ones that did well (they got big),
   so every strategy and the random traders look better than they would have in real time.
   The random-trader comparison is fair (they get the same stocks); the dollar totals are flattering.
+
+Round 7  (written Oct 27 2026, before testing): VOLUME CANDLES  (volume_bars_test.py)
+  Same strategies on volume candles (one candle per average day's worth of shares traded,
+  sized only from the 20 days before) vs time candles (one per day), both built from the same
+  minute prices, 60-stock list, last 3 years, regular hours, IEX volume only.
+  Rules: Wren moves to volume candles only if Bollinger bounce PASSES on them AND makes more
+  than on the time candles, in the exam too. A candle pattern earns Gareth a strategy only if
+  it PASSES on volume candles.

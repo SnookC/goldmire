@@ -102,3 +102,17 @@ Round 8  (written Oct 27 2026, before testing): MACD, in all of the above
   test, under the same rules as the others: Gareth gets one only if it PASSES on the 300 (and
   on 12 and 60), or PASSES on volume candles.
   Ideas tried: 15. With this many, expect roughly one "pass" by luck sooner or later.
+
+Results, rounds 6 and 8 (Oct 27 2026; "random" = share of random traders beaten, a pass needs 95%):
+                                 12 stocks         60 stocks         300 stocks, 5 years
+  Bollinger bounce (Wren) ...... PASSES 96%        PROMISING 85%     PROMISING 84% (+$3,434, 3,240 trades)
+  Bollinger + candle ........... PROMISING 86%     FAILS 70%         PROMISING 92% (+$1,808)
+  Bollinger (fair weather) ..... FAILS 55%         FAILS 60%         FAILS 57%
+  12-1 momentum (weather) ...... FAILS 8%          FAILS 0%          FAILS 33%
+  Hammer ....................... FAILS 56%         FAILS 61%         FAILS 53%
+  Bullish engulfing ............ FAILS 50%         FAILS 21%         FAILS 27%
+  Morning star ................. FAILS             FAILS 4%          FAILS 19%
+  MACD crossover + 200-day ..... FAILS 20%         FAILS 1%          FAILS 0%
+  MACD zero-line + swing lows .. FAILS 2%          FAILS 4%          FAILS 2%
+  Wren keeps plain Bollinger bounce (PROMISING on the 300, per the round 6 rule). Nothing for
+  Gareth. Bollinger + candle doesn't replace it (it made about half as much).

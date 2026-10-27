@@ -88,10 +88,10 @@ def due():
 # ---------------------------------------------------------------------------
 # data
 # ---------------------------------------------------------------------------
-def fetch_stories(news_client, symbols, start, end, log):
+def fetch_stories(news_client, symbols, start, end, log, max_stories=MAX_STORIES):
     from alpaca.data.requests import NewsRequest
     out, seen, t = [], set(), start
-    while t < end and len(out) < MAX_STORIES:
+    while t < end and len(out) < max_stories:
         t2 = min(end, t + timedelta(days=7))
         for i in range(0, len(symbols), 30):                 # keep each request's symbol list short
             try:

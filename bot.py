@@ -44,6 +44,7 @@ import calendar_desk
 import scorecard
 import finbert
 import news_replay
+import news_exit_test
 
 # ---------------------------------------------------------------------------
 # SETTINGS  (bots themselves are in bots.json)
@@ -1515,7 +1516,7 @@ REPLAY = []    # [news client, stock data client, running?]
 
 def maybe_news_replay(memory):
     """Once FinBERT is ready: the replay test, in the background, now and then once a week."""
-    if not REPLAY or REPLAY[2] or not finbert.ready() or not news_replay.due():
+    if not REPLAY or REPLAY[2] or not finbert.ready() or not (news_replay.due() or news_exit_test.due()):
         return
     if memory.get("news_replay_failed", "") > (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat():
         return                                  # failed recently: wait a while before trying again
@@ -1524,8 +1525,11 @@ def maybe_news_replay(memory):
 
     def work():
         try:
-            names = {a.symbol: a.name for a in research.us_equities(REPLAY[3])}
-            news_replay.run(REPLAY[0], REPLAY[1], lambda m: log.info(m), extra=extra, names=names)
+            if news_replay.due():
+                names = {a.symbol: a.name for a in research.us_equities(REPLAY[3])}
+                news_replay.run(REPLAY[0], REPLAY[1], lambda m: log.info(m), extra=extra, names=names)
+            if news_exit_test.due():
+                news_exit_test.run(REPLAY[0], lambda m: log.info(m))
         except Exception as e:  # noqa: BLE001
             memory["news_replay_failed"] = datetime.now(timezone.utc).isoformat()
             log.info(f"News replay: didn't finish ({e}); trying again in 6 hours")

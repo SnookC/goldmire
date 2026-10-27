@@ -275,9 +275,34 @@ def _market_view(day):
     return MARKET["c"][max(0, j - MARKET_LOOKBACK):j]
 
 
-def simulate(strategy, series, market, errors=None, cost=None):
+def _sessions(series):
+    """(open, close) timestamps of each daily bar's New York trading session."""
+    from zoneinfo import ZoneInfo
+    ny = ZoneInfo("America/New_York")
+    out = []
+    for x in series["t"]:
+        d = datetime.fromisoformat(str(x)).astimezone(ny).date() if "T" in str(x) else datetime.fromisoformat(str(x)).date()
+        out.append((datetime(d.year, d.month, d.day, 9, 30, tzinfo=ny).timestamp(), datetime(d.year, d.month, d.day, 16, 0, tzinfo=ny).timestamp()))
+    return out
+
+
+NEWS_BLOCK_HOURS = 3      # (news.ALARM_HOURS) fresh bad news blocks a buy this long
+
+
+def simulate(strategy, series, market, errors=None, cost=None, news=None):
     """Replays one symbol. Returns a list of trades: {entry_t, exit_t, ret (after costs), exit_i, why}.
-    Errors raised by the strategy are counted in `errors` (a dict) rather than stopping the test."""
+    Errors raised by the strategy are counted in `errors` (a dict) rather than stopping the test.
+
+    news: sorted times (unix seconds) of the word list's bad-news calls on this symbol (daily bars only).
+    Then the replay also does what the heroes do live: sell on bad news (at the open if it came out
+    overnight, at the day's typical price if during the session), no buying it back for 24 hours,
+    and no buying while the news is under NEWS_BLOCK_HOURS old."""
+    import bisect as _b
+    sess = _sessions(series) if news else None
+
+    def alarm_in(a, b):                      # the first call in (a, b], or None
+        k = _b.bisect_right(news, a)
+        return news[k] if k < len(news) and news[k] <= b else None
     o, h, l, c, t = series["o"], series["h"], series["l"], series["c"], series["t"]
     n, lb = len(c), strategy.lookback
     cost = COST[market] if cost is None else cost
@@ -288,7 +313,18 @@ def simulate(strategy, series, market, errors=None, cost=None):
     trades, entry, entry_i, pending = [], None, None, None
     stop, peak, cool_until = None, 0.0, float("-inf")
     for i in range(1, n):
+        if news:                                  # bad news overnight: sell at the open, and don't buy into it
+            a = alarm_in(sess[i - 1][1], sess[i][0])
+            if a is not None:
+                if entry is not None:
+                    trades.append({"entry_i": entry_i, "exit_i": i, "ret": o[i] * (1 - cost) / entry - 1, "why": "bad news"})
+                    entry, pending = None, None
+                    cool_until = max(cool_until, sess[i][0] + exits.COOLDOWN_HOURS * 3600)
+                elif pending == "buy" and sess[i][0] - a <= NEWS_BLOCK_HOURS * 3600:
+                    pending = None
         # 1) fill yesterday's decision at this bar's open
+        if pending == "buy" and entry is None and sess is not None and sess[i][0] < cool_until:
+            pending = None
         if pending == "buy" and entry is None and ts[i] >= cool_until:
             entry, entry_i, peak = o[i] * (1 + cost), i, o[i]
             stop = exits.stop_fraction(strategy.stop_loss, c[max(0, i - exits.VOL_WINDOW - 1):i], market, strategy.timeframe)
@@ -297,6 +333,13 @@ def simulate(strategy, series, market, errors=None, cost=None):
             trades.append({"entry_i": entry_i, "exit_i": i, "ret": o[i] * (1 - cost) / entry - 1, "why": "signal"})
             entry = None
         pending = None
+        if news and entry is not None:            # bad news during the session: sold at about the day's typical price
+            a = alarm_in(sess[i][0], sess[i][1])
+            if a is not None:
+                fill = (o[i] + h[i] + l[i] + c[i]) / 4
+                trades.append({"entry_i": entry_i, "exit_i": i, "ret": fill * (1 - cost) / entry - 1, "why": "bad news"})
+                entry = None
+                cool_until = max(cool_until, a + exits.COOLDOWN_HOURS * 3600)
         # 2) stops inside this bar
         if entry is not None:
             raw_entry = entry / (1 + cost)

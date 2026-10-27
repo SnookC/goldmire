@@ -1,6 +1,6 @@
 {
-  "version": "1.5.24",
+  "version": "1.5.25",
   "notes": [
-    "The news replay runs as soon as a new test is added (it only waits after a failure)."
+    "New test, runs by itself in the background: does selling on bad-news headlines help Wren, or should her Bollinger rules decide every exit? Real headlines and prices from the last year."
   ]
 }

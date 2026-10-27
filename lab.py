@@ -22,7 +22,8 @@ import backtest
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = backtest.OUT_DIR
 IDEAS = ["bollinger_bounce_weather", "momentum_weather",                                  # round 4
-         "hammer_reversal", "engulfing_reversal", "morning_star_reversal", "bollinger_bounce_candle"]   # round 5
+         "hammer_reversal", "engulfing_reversal", "morning_star_reversal", "bollinger_bounce_candle",   # round 5
+         "macd_signal_cross", "macd_zero_cross"]                                                        # round 8
 FOR_WREN = {"bollinger_bounce_weather", "bollinger_bounce_candle"}
 REFERENCE = "bollinger_bounce"
 STATE = os.path.join(OUT_DIR, "lab_state.json")

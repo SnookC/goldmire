@@ -93,3 +93,12 @@ Round 7  (written Oct 27 2026, before testing): VOLUME CANDLES  (volume_bars_tes
   Rules: Wren moves to volume candles only if Bollinger bounce PASSES on them AND makes more
   than on the time candles, in the exam too. A candle pattern earns Gareth a strategy only if
   it PASSES on volume candles.
+
+Round 8  (written Oct 27 2026, before testing): MACD, in all of the above
+  14. MACD crossover + 200-day filter (12/26/9)  .. for Gareth
+  15. MACD zero-line cross + swing lows .......... for Gareth
+  Both already sat in the strategies folder (part of the first Proving Grounds batch). Now they
+  run in the Lab (12 and 60 stocks), the big test (300 stocks, 5 years) and the volume-candle
+  test, under the same rules as the others: Gareth gets one only if it PASSES on the 300 (and
+  on 12 and 60), or PASSES on volume candles.
+  Ideas tried: 15. With this many, expect roughly one "pass" by luck sooner or later.

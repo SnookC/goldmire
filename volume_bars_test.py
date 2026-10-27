@@ -18,7 +18,8 @@ Tested on both: Wren's Bollinger bounce, Bollinger + candle, and the three candl
 THE RULES:
   * Wren moves to volume candles only if Bollinger bounce PASSES on them AND makes more than on
     the time candles from the same minutes, in the exam too.
-  * A candle pattern earns Gareth a strategy only if it PASSES on volume candles.
+  * A candle pattern (or MACD, added the same day) earns Gareth a strategy only if it PASSES
+    on volume candles.
 """
 import json
 import os
@@ -32,7 +33,8 @@ OUT_JSON = os.path.join(backtest.OUT_DIR, "volume_bars.json")
 CACHE = os.path.join(backtest.OUT_DIR, "data", "volume_bars_cache.json")
 YEARS = 3
 AVG_DAYS = 20
-STRATEGIES = ["bollinger_bounce", "bollinger_bounce_candle", "hammer_reversal", "engulfing_reversal", "morning_star_reversal"]
+STRATEGIES = ["bollinger_bounce", "bollinger_bounce_candle", "hammer_reversal", "engulfing_reversal", "morning_star_reversal",
+              "macd_signal_cross", "macd_zero_cross"]
 
 
 def due():
@@ -158,7 +160,8 @@ def run(raw_client, log=print, years=YEARS, symbols=None):
     b = res["bollinger_bounce"]
     wren = (b["volume"]["verdict"] == "PASSES" and b["volume"]["pl"] > b["time"]["pl"]
             and b["volume"]["exam_pl"] > b["time"]["exam_pl"])
-    gareth = [res[k]["name"] for k in ("hammer_reversal", "engulfing_reversal", "morning_star_reversal")
+    gareth = [res[k]["name"] for k in ("hammer_reversal", "engulfing_reversal", "morning_star_reversal",
+                                       "macd_signal_cross", "macd_zero_cross")
               if res[k]["volume"]["verdict"] == "PASSES"]
     verdict = ("SWITCH WREN TO VOLUME CANDLES" if wren else "KEEP TIME CANDLES FOR WREN") + \
               (f"; for Gareth: {', '.join(gareth)} passes on volume candles" if gareth else "; nothing for Gareth")

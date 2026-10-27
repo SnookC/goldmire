@@ -263,7 +263,6 @@ YOUR HOLDS: BUY SOMETHING AND KEEP IT UNTIL YOU SAY SELL (from version 1.5.18)
   Gareth holds $300 of XRPN (Evernorth) for you this way (paper money, like everything else).
   When you say sell it, Gareth retires ("retire_to": "Stock-2"): his whole pot goes to Wren
   (anything over her pot limit goes to her savings) and he leaves the hero list.
-  Was: (paper money, like everything else).
 
 THE WATCHDOG: ALERTS WHEN SOMETHING KEEPS GOING WRONG (from version 1.5.14)  -- watchdog.py
   The Watchdog reads Goldmire's log. When the same problem repeats (3 times within

@@ -219,6 +219,20 @@ THE TEAM: TWO TRADERS AND THREE GUARDIANS (from version 1.5.11)
       any part of the account's change today the heroes' trades don't explain.
       A gap over $25 is logged as a WARNING.
 
+WREN TRADES ONLY HER TESTED RULES (from version 1.5.26)
+  A test on the last year of real headlines (news_exit_test.py) found headline selling cost
+  Wren money: her Bollinger rules alone +$85, with headline selling +$60. So for Wren:
+  "news_exit": false (no selling or skipped buys on headlines) and "news_hold": false.
+  She also makes fewer, bigger trades: "max_positions": 8 and "risk": 0.015 (each trade
+  risks 1.5% of her pot if its stop is hit, about twice the size). She keeps what she holds
+  and simply stops buying until she's under 8.
+
+THE LAB: NEW IDEAS TESTED IN THE BACKGROUND (from version 1.5.26)  -- lab.py
+  Tests a batch of ideas on the 12-stock list and the 60-stock list without touching the
+  main results (results.json, which Bram and the Scorecard read). What each idea needs is
+  written in strategies\EXPERIMENTS.txt before the run. Reports: proving_grounds\report_lab.html
+  and report_lab_wide.html.
+
 FINBERT: A SECOND NEWS READER, IN SHADOW (from version 1.5.21)  -- finbert.py, news_replay.py
   The Town Crier reads headlines with a word list. FinBERT is a small free AI model
   (ProsusAI/finbert, from Hugging Face) trained on financial news. It reads every

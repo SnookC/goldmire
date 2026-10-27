@@ -207,6 +207,10 @@ SETTINGS_UPDATES = [
     ("2026-10-22-xrpn", "you asked to move the $300 from XRP into XRPN (Evernorth): Gareth buys XRPN, then sells the XRP", {
         "Stock-1": {"owner_holds": {"XRPN": 300}},
     }),
+    ("2026-10-27-wren-rules-only", "Wren trades only the rules that were tested: no selling (or skipping buys) on headlines, "
+     "no good-news hold; and fewer, bigger trades (8 at once, each risking 1.5% of her pot instead of 0.75%)", {
+        "Stock-2": {"news_exit": False, "news_hold": False, "max_positions": 8, "risk": 0.015},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [
@@ -925,7 +929,7 @@ def run_bot(bot, rnd, memory):
     else:
         candidates = [s for s in research.watchlist(bot, memory) if norm(s) not in skip and ("/" in s) == (kind == "crypto")]
         prices = {}
-    blocked = [s for s in candidates if news.alarm_for(memory, s)]
+    blocked = [s for s in candidates if news.alarm_for(memory, s)] if bot.get("news_exit", True) else []
     if blocked:
         log.info(f"[{name}] skipping {', '.join(blocked)}: fresh bad news")
         candidates = [s for s in candidates if s not in blocked]

@@ -1,7 +1,7 @@
 {
   "version": "1.5.26",
   "notes": [
-    "The Lab: tests new strategy ideas in the background without touching the main results. First batch: candlestick patterns (hammer, bullish engulfing, morning star, and Wren's Bollinger bounce confirmed by a candle) plus the two market-weather ideas, on 12 and 60 stocks.",
-    "The headline-selling test for Wren keeps running too."
+    "Wren now trades only her tested rules: no more selling on headlines (the test on the last year: her rules alone made $85, with headline selling $60). She also makes fewer, bigger trades: 8 at once, about twice the size.",
+    "The Lab: tests new strategy ideas in the background without touching the main results. First batch: candlestick patterns and the two market-weather ideas, on 12 and 60 stocks."
   ]
 }

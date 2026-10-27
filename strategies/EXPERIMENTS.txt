@@ -51,3 +51,21 @@ Round 5  (written Oct 27 2026, before testing): CANDLESTICK PATTERNS
 
 Total ideas tried so far: 13 (11 for Gareth). With this many tries, one passing by luck is
 a real possibility: a pass is a reason to trade it on paper, not proof.
+
+Results (Oct 27 2026, the Lab; "random" = share of random traders it beat, a pass needs 95%):
+                                   12 stocks                        60 stocks
+   8. Bollinger (fair weather) .. FAILS (+$164, random 55%)       FAILS (+$285, random 60%)
+   9. 12-1 momentum (weather) ... FAILS (+$431, random 8%)        FAILS (+$442, random 0%)
+  10. Hammer reversal ........... FAILS (+$72, random 56%)        FAILS (+$181, random 61%)
+  11. Bullish engulfing ......... FAILS (+$56, random 50%)        FAILS (+$32, exam lost $46)
+  12. Morning star .............. FAILS (12 trades)               FAILS (-$43)
+  13. Bollinger + candle ........ PROMISING (+$138, random 86%)   FAILS (+$213, random 70%)
+  For comparison, plain Bollinger bounce on the same prices: PASSES (+$296, random 96%)
+  on 12 stocks, PROMISING (+$500, random 85%) on 60.
+  None adopted. Gareth stays in cash; Wren keeps plain Bollinger bounce.
+  Ideas tried: 13. Passed: 0 (Wren's original Bollinger bounce is still the only pass).
+
+Headline selling (Oct 27 2026, news_exit_test.py, Wren's Bollinger bounce, 60 stocks, last year,
+every real headline): her rules alone +$85.45 (129 trades), with headline selling +$60.10
+(143 trades, 57 sold on news). Rule: keep only if 5% better AND better in the exam. It wasn't:
+Wren stops selling on headlines (1.5.26).

@@ -116,3 +116,10 @@ Results, rounds 6 and 8 (Oct 27 2026; "random" = share of random traders beaten,
   MACD zero-line + swing lows .. FAILS 2%          FAILS 4%          FAILS 2%
   Wren keeps plain Bollinger bounce (PROMISING on the 300, per the round 6 rule). Nothing for
   Gareth. Bollinger + candle doesn't replace it (it made about half as much).
+
+Results, round 7 and the big headline test (Oct 27 2026):
+  Headline selling, 300 stocks, 5 years: her rules alone +$3,330 (3,067 trades), with headline
+  selling +$2,814 (3,164 trades, 535 sold on news). STOP HEADLINE SELLING (confirms 1.5.26).
+  Volume candles vs time candles, 60 stocks, 3 years of minute prices (IEX volume): every
+  strategy FAILS on both. Bollinger bounce: time candles +$235 (beat 50% of random), volume
+  candles +$76 (beat 10%). KEEP TIME CANDLES FOR WREN; nothing for Gareth.

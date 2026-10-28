@@ -243,6 +243,8 @@ def apply_pot_moves(memory, bots):
         committed = sum(float(h.get("cost") or 0) for h in held_by(memory, names[frm]).values())
         amount = round(max(0.0, src["pot"] - committed), 2)
         src["pot"] = round(src["pot"] - amount, 2)
+        scorecard.shift(memory, frm, -amount)
+        scorecard.shift(memory, to, amount)
         limit = bank.TIERS[dst["tier"]]["limit"]
         dst["pot"] = round(dst["pot"] + amount, 2)
         extra = round(max(0.0, dst["pot"] - limit), 2)
@@ -855,6 +857,8 @@ def retire_heroes(bots, memory):
             dst["pot"] = float(limit)
             dst["savings"] = round(dst["savings"] + extra, 2)
         src["pot"] = 0.0
+        scorecard.shift(memory, b["name"], -amount)
+        scorecard.shift(memory, to["name"], amount - extra)
         b["retired"], b["benched"] = True, True
         for k, v in (("retired", True), ("benched", True)):
             _save_bot_field(b["name"], k, v)
@@ -1773,6 +1777,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     memory = load_memory()
     apply_pot_topups(memory, bots)
     apply_pot_moves(memory, bots)
+    scorecard.apply_fixes(memory)
     validator.review(bots, memory, log.info)
     taught = {}
     for b, k, v in TRAINING:

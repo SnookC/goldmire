@@ -1,6 +1,6 @@
 {
-  "version": "1.6.2",
+  "version": "1.6.3",
   "notes": [
-    "Calendar fix: the economic releases (Fed decisions, jobs, inflation) were showing one day late. Their times are now right after the clocks change, and minor sub-reports are left out."
+    "Scorecard fix: money you move between heroes (like Gareth's spare $219 to Wren) no longer counts as a trading result."
   ]
 }

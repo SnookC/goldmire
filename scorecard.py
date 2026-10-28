@@ -48,6 +48,29 @@ def _tested(strategy):
             "trades": r["trades"], "verdict": r.get("verdict"), "run": res.get("run")}
 
 
+def shift(memory, name, amount):
+    """Money moved into (+) or out of (-) a trader's pot by you, not earned: move its starting
+    point the same amount so the Scorecard's result doesn't count it."""
+    st = memory.get("score_start", {}).get(name)
+    if st:
+        st["pot"] = round(st["pot"] + amount, 2)
+
+
+# one-time corrections for money moved before shift() existed
+FIXES = [("2026-10-28-gareth-spare", {"Stock-1": -219.41, "Stock-2": 219.41})]
+
+
+def apply_fixes(memory):
+    done = set(memory.setdefault("score_fixes", []))
+    for uid, moves in FIXES:
+        if uid in done:
+            continue
+        for name, amount in moves.items():
+            shift(memory, name, amount)
+        done.add(uid)
+    memory["score_fixes"] = sorted(done)
+
+
 def update(memory, bots, positions, spy_now, today, norm, pot_of, log=print):
     """Recompute every trader's scorecard. spy_now: the S&P 500 fund's latest close (or None)."""
     starts = memory.setdefault("score_start", {})

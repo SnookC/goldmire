@@ -26,7 +26,24 @@ BIG_EVENTS = ("cpi", "consumer price", "pce", "ppi", "producer price", "nonfarm"
               "initial jobless claims", "fomc", "fed interest rate", "federal reserve", "fed chair", "interest rate decision",
               "gdp", "retail sales", "ism manufacturing", "ism services", "ism non-manufacturing", "consumer confidence",
               "michigan consumer sentiment", "jolts", "durable goods orders", "powell")
-SKIP_EVENTS = ("gdpnow", "core durable", "reserve balances")
+SKIP_EVENTS = ("gdpnow", "core durable", "reserve balances", "member", " prices", "employment", "new orders", "business activity",
+               "gdp price", "gdp sales", "dallas fed", "productivity", "4-week", "continuing", "excluding")
+ECONOMY_SHIFT_DAYS = 1      # Nasdaq's economic calendar for date D lists the events of the day BEFORE
+                            # (found Oct 28 2026: asking for Oct 29 returned that day's Fed decision and
+                            # GDPNow reading; asking for Oct 23 returned Thursday Oct 22's jobless claims)
+CAL_VERSION = 3
+NASDAQ_UTC_OFFSET_H = 4     # its "gmt" times are really UTC-4 all year (right in summer, an hour late in winter)
+
+
+def _ny_time(day, hhmm):
+    """Nasdaq's time (UTC-4) on that day -> New York time, HH:MM."""
+    try:
+        from zoneinfo import ZoneInfo
+        h, m = (int(x) for x in hhmm.split(":")[:2])
+        utc = datetime.fromisoformat(f"{day}T{h:02d}:{m:02d}:00+00:00") + timedelta(hours=NASDAQ_UTC_OFFSET_H)
+        return utc.astimezone(ZoneInfo("America/New_York")).strftime("%H:%M")
+    except Exception:  # noqa: BLE001
+        return hhmm
 RETRY_AFTER_FAIL = 3600
 
 
@@ -74,7 +91,7 @@ class Desk:
     def refresh(self, today=None, log=print, force=False):
         """Download the next CALENDAR_DAYS weekdays once a day. Never raises."""
         today = today or date.today()
-        if not force and self.data.get("day") == today.isoformat():
+        if not force and self.data.get("day") == today.isoformat() and self.data.get("v") == CAL_VERSION:
             return False
         if time.time() - self.failed_at < RETRY_AFTER_FAIL:
             return False
@@ -90,22 +107,32 @@ class Desk:
                                          "name": (r.get("name") or "").strip()}
             except Exception:  # noqa: BLE001
                 errors += 1
+        last = _weekdays(today, CALENDAR_DAYS)[-1]
+        q, seen = today + timedelta(days=ECONOMY_SHIFT_DAYS), set()
+        while q <= last + timedelta(days=ECONOMY_SHIFT_DAYS):          # every calendar day: Friday's events sit under Saturday
+            ds = (q - timedelta(days=ECONOMY_SHIFT_DAYS)).isoformat()   # the day they really happen
             try:
-                rows = ((_get(ECONOMY_URL.format(d=ds)).get("data") or {}).get("rows")) or []
+                rows = ((_get(ECONOMY_URL.format(d=q.isoformat())).get("data") or {}).get("rows")) or []
                 for r in rows:
                     name = (r.get("eventName") or "").strip()
                     low = name.lower() + " "
                     if r.get("country") != "United States" or not any(k in low for k in BIG_EVENTS) or any(k in low for k in SKIP_EVENTS):
                         continue
-                    economy.append({"date": ds, "time_et": _clean(r.get("gmt")), "event": name, "actual": _clean(r.get("actual")),
+                    key = (ds, name.lower())
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    economy.append({"date": ds, "time_et": _ny_time(ds, _clean(r.get("gmt"))), "event": name, "actual": _clean(r.get("actual")),
                                     "consensus": _clean(r.get("consensus")), "previous": _clean(r.get("previous"))})
             except Exception:  # noqa: BLE001
                 errors += 1
+            q += timedelta(days=1)
+        economy.sort(key=lambda e: (e["date"], e["time_et"]))
         if errors >= CALENDAR_DAYS * 2:                # everything failed: keep the old calendar
             self.failed_at = time.time()
             log("Calendar Desk: couldn't download the earnings and economic calendars; trying again in an hour")
             return False
-        self.data = {"day": today.isoformat(), "fetched": datetime.now().isoformat(timespec="seconds"),
+        self.data = {"v": CAL_VERSION, "day": today.isoformat(), "fetched": datetime.now().isoformat(timespec="seconds"),
                      "earnings": earnings, "economy": economy}
         self._save()
         log(f"Calendar Desk: {len(earnings)} companies report earnings and {len(economy)} big US economic releases "

@@ -1,6 +1,6 @@
 {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "notes": [
-    "One-time deal for the Fed decision: Wren may hold up to 16 stocks through Friday Oct 30 (then back to 8), and Gareth's spare $219 moves to her pot now."
+    "Calendar fix: the economic releases (Fed decisions, jobs, inflation) were showing one day late. Their times are now right after the clocks change, and minor sub-reports are left out."
   ]
 }

@@ -219,6 +219,13 @@ THE TEAM: TWO TRADERS AND THREE GUARDIANS (from version 1.5.11)
       any part of the account's change today the heroes' trades don't explain.
       A gap over $25 is logged as a WARNING.
 
+THE DASHBOARD (from version 1.6.0)  -- world\world.html
+  Frosted glass over a warm room. Same address as before (http://localhost:8777/world.html
+  and the phone link), so shortcuts keep working. Pages along the bottom: Overview, Activity,
+  Heroes, Guardians, Reports (scorecard + test results), Calendar; + suggests a stock.
+  The round arrow (top right) installs updates. The house button opens the old storybook town
+  (world\town.html), which still has the full day-by-day ledger, exports and benching.
+
 WREN TRADES ONLY HER TESTED RULES (from version 1.5.26)
   A test on the last year of real headlines (news_exit_test.py) found headline selling cost
   Wren money: her Bollinger rules alone +$85, with headline selling +$60. So for Wren:

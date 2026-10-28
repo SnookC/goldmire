@@ -1,6 +1,7 @@
 {
-  "version": "1.5.29",
+  "version": "1.6.0",
   "notes": [
-    "Gareth retires once your XRPN is sold: his whole pot moves to Wren and he leaves the hero list. Nothing changes until you say sell."
+    "A new look: the dashboard is now frosted glass over a warm room, with pages for Overview, Activity, Heroes, Guardians, Reports (scorecard and test results) and Calendar. Works on your phone too.",
+    "The old storybook town is still there: the house button at the top right."
   ]
 }

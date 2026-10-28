@@ -1130,6 +1130,37 @@ def guardians_status(memory, positions, bots):
     }
 
 
+def tests_summary():
+    """The latest results of the background tests, for the dashboard's Reports page."""
+    pg = os.path.join(HERE, "proving_grounds")
+
+    def rd(name):
+        try:
+            with open(os.path.join(pg, name), encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+    out = {}
+    big, lab_ = rd("lab_state_300.json"), rd("lab_state.json")
+    if big:
+        out["big"] = {"run": big.get("run"), "stocks": big.get("stocks"), "years": big.get("years"),
+                      "rows": [{k: r.get(k) for k in ("name", "verdict", "trades", "pl", "exam_pl", "beats_random")} for r in big.get("summary", [])]}
+    if lab_:
+        out["lab"] = {"run": lab_.get("run"), "rows": lab_.get("summary", []), "reference": lab_.get("reference")}
+    for key, name in (("headlines", "news_exit_test.json"), ("headlines_300", "news_exit_test_300.json")):
+        r = rd(name)
+        if r:
+            out[key] = {k: r.get(k) for k in ("run", "days", "stocks", "verdict", "why", "rules_only", "with_headlines")}
+    v = rd("volume_bars.json")
+    if v:
+        out["volume"] = {"run": v.get("run"), "verdict": v.get("verdict"), "years": v.get("years"), "stocks": v.get("stocks"),
+                         "rows": [{"name": r["name"], "time": r["time"], "volume": r["volume"]} for r in (v.get("results") or {}).values()]}
+    n = rd("news_replay.json")
+    if n:
+        out["news"] = {k: n.get(k) for k in ("run", "verdict", "why", "about_verdict", "about_why")}
+    return out
+
+
 def write_status(status):
     os.makedirs(WORLD_DIR, exist_ok=True)
     tmp = STATUS_FILE + ".tmp"
@@ -1169,6 +1200,7 @@ def update_world(trading, memory, market_open, bots):
         status["calendar"] = DESK[0].summary(held)
     try:
         status["guardians"] = guardians_status(memory, positions, bots)
+        status["tests"] = tests_summary()
     except Exception as e:  # noqa: BLE001 - a bonus panel; never stop the heroes over it
         log.error(f"World: couldn't build the guardians' panel -> {e}")
     save_memory(memory)

@@ -215,12 +215,54 @@ SETTINGS_UPDATES = [
     ("2026-10-27-gareth-retires", "Gareth retires once your XRPN is sold: his pot then goes to Wren", {
         "Stock-1": {"retire_to": "Stock-2"},
     }),
+    ("2026-10-28-fed-days", "one-time deal for the Fed decision: Wren may hold up to 16 stocks through Fri Oct 30, then back to 8 "
+     "(and Gareth's spare cash moves to her now)", {
+        "Stock-2": {"slots_boost": {"max": 16, "until": "2026-10-30"}},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [
     ("2026-10-13-stocks-only", {"Stock-1": 200, "Stock-2": 200, "Crypto-1": 200, "Crypto-2": 200}),
     ("2026-10-23-two-traders", {"Stock-1": 200, "Stock-2": 200}),
 ]
+
+
+# One-time moves of a hero's spare money (pot minus what its holdings cost) to another hero.
+POT_MOVES = [
+    ("2026-10-28-gareth-spare", "Stock-1", "Stock-2"),     # Gareth's spare cash to Wren before the Fed decision
+]
+
+
+def apply_pot_moves(memory, bots):
+    done = set(memory.setdefault("applied_moves", []))
+    names = {b["name"]: b for b in bots}
+    for uid, frm, to in POT_MOVES:
+        if uid in done or frm not in names or to not in names:
+            continue
+        src, dst = bank._acct(memory, names[frm]), bank._acct(memory, names[to])
+        committed = sum(float(h.get("cost") or 0) for h in held_by(memory, names[frm]).values())
+        amount = round(max(0.0, src["pot"] - committed), 2)
+        src["pot"] = round(src["pot"] - amount, 2)
+        limit = bank.TIERS[dst["tier"]]["limit"]
+        dst["pot"] = round(dst["pot"] + amount, 2)
+        extra = round(max(0.0, dst["pot"] - limit), 2)
+        if extra:
+            dst["pot"], dst["savings"] = float(limit), round(dst["savings"] + extra, 2)
+        done.add(uid)
+        log.info(f"[{frm}] moved ${amount:,.2f} of spare money to {names[to].get('hero', to)} "
+                 f"(her pot ${dst['pot']:,.2f}; {names[frm].get('hero', frm)} keeps ${src['pot']:,.2f} for what he holds)")
+    memory["applied_moves"] = sorted(done)
+    save_memory(memory)
+
+
+def max_positions(bot, day=None):
+    """The most positions a hero may hold today: "slots_boost": {"max": 16, "until": "2026-10-30"}
+    in bots.json raises it for a few days (inclusive, New York date)."""
+    boost = bot.get("slots_boost") or {}
+    day = day or report.ny().strftime("%Y-%m-%d")
+    if boost.get("max") and day <= str(boost.get("until", "")):
+        return max(int(bot["max_positions"]), int(boost["max"]))
+    return int(bot["max_positions"])
 
 
 def apply_pot_topups(memory, bots):
@@ -934,7 +976,7 @@ def run_bot(bot, rnd, memory):
     if risk.daily_stop_hit(memory, rnd.positions, report.ny().strftime("%Y-%m-%d"), report.day_of, norm, log.info):
         log.info(f"[{name}] Pip's daily stop is on: no new buys today")
         return
-    free_slots = bot["max_positions"] - len(held)
+    free_slots = max_positions(bot) - len(held)
     if free_slots <= 0:
         return
     committed = sum(h["cost"] for h in held.values())
@@ -1057,7 +1099,7 @@ def build_status(positions, memory, market_open, bots):
             "pinned": list(b.get("pinned", [])),
             "researched": research.is_researched(b),
             "reasons": {} if research.scan_size(b) else rs.get("reasons", {}).get(b["name"], {}),
-            "max_positions": b["max_positions"], "positions": pos_list, "holding": bool(pos_list),
+            "max_positions": max_positions(b), "positions": pos_list, "holding": bool(pos_list),
             "symbol": ", ".join(p["symbol"] for p in pos_list) or ("penny stocks" if b["kind"] == "penny" else (f"all {len(wl)} coins" if b["kind"] == "crypto" else f"the {len(wl)} busiest stocks") if research.scan_size(b) else ", ".join(wl[:3])),
             "realized_pl": realized, "unrealized_pl": unrealized, "pl": round(realized + unrealized, 2),
             "hero": game.hero_block(memory, b), "bank": bank.status(memory, b), "dollars": bank.trade_size(memory, b),
@@ -1730,6 +1772,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     DESK[:] = [calendar_desk.Desk()]
     memory = load_memory()
     apply_pot_topups(memory, bots)
+    apply_pot_moves(memory, bots)
     validator.review(bots, memory, log.info)
     taught = {}
     for b, k, v in TRAINING:

@@ -1,6 +1,6 @@
 {
-  "version": "1.6.3",
+  "version": "1.6.4",
   "notes": [
-    "Scorecard fix: money you move between heroes (like Gareth's spare $219 to Wren) no longer counts as a trading result."
+    "You said sell the XRPN: Gareth sells it when the market opens, then retires and his pot moves to Wren."
   ]
 }

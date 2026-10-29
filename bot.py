@@ -219,6 +219,9 @@ SETTINGS_UPDATES = [
      "(and Gareth's spare cash moves to her now)", {
         "Stock-2": {"slots_boost": {"max": 16, "until": "2026-10-30"}},
     }),
+    ("2026-10-29-sell-xrpn", "you said sell the XRPN: Gareth sells it at the next open, then retires and hands his pot to Wren", {
+        "Stock-1": {"owner_holds": {}},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [

@@ -230,7 +230,7 @@ WREN TRADES ONLY HER TESTED RULES (from version 1.5.26)
   A test on the last year of real headlines (news_exit_test.py) found headline selling cost
   Wren money: her Bollinger rules alone +$85, with headline selling +$60. So for Wren:
   "news_exit": false (no selling or skipped buys on headlines) and "news_hold": false.
-  She also makes fewer, bigger trades: "max_positions": 8 and "risk": 0.015 (each trade
+  She also makes fewer, bigger trades: "max_positions": 12 (8 until Oct 30) and "risk": 0.015 (each trade
   risks 1.5% of her pot if its stop is hit, about twice the size). She keeps what she holds
   and simply stops buying until she's under 8.
 

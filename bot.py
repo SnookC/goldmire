@@ -47,6 +47,7 @@ import news_replay
 import news_exit_test
 import lab
 import volume_bars_test
+import stop_test
 
 # ---------------------------------------------------------------------------
 # SETTINGS  (bots themselves are in bots.json)
@@ -1207,6 +1208,11 @@ def tests_summary():
     if v:
         out["volume"] = {"run": v.get("run"), "verdict": v.get("verdict"), "years": v.get("years"), "stocks": v.get("stocks"),
                          "rows": [{"name": r["name"], "time": r["time"], "volume": r["volume"]} for r in (v.get("results") or {}).values()]}
+    st = rd("stop_test.json")
+    if st:
+        out["stops"] = {"run": st.get("run"), "verdict": st.get("verdict"), "why": st.get("why"),
+                        "rows": [{"name": nm, **{lb: (st["results"].get(lb) or {}).get(nm) for lb in ("12 stocks", "60 stocks", "300 stocks")}}
+                                 for nm in ("no stop", "smart stop", "8% stop", "10% stop", "15% stop")]}
     n = rd("news_replay.json")
     if n:
         out["news"] = {k: n.get(k) for k in ("run", "verdict", "why", "about_verdict", "about_why")}
@@ -1639,7 +1645,7 @@ def maybe_news_replay(memory):
     """Once FinBERT is ready: the replay test, in the background, now and then once a week."""
     replay_due = finbert.ready() and news_replay.due()
     if not REPLAY or REPLAY[2] or not (replay_due or news_exit_test.due() or lab.due() or lab.due(big=True)
-                                       or news_exit_test.due(NEWS_EXIT_300) or volume_bars_test.due()):
+                                       or news_exit_test.due(NEWS_EXIT_300) or volume_bars_test.due() or stop_test.due()):
         return
     if memory.get("news_replay_failed", "") > (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat():
         return                                  # failed recently: wait a while before trying again
@@ -1653,6 +1659,7 @@ def maybe_news_replay(memory):
                  ("Headline-selling test", lambda: news_exit_test.run(REPLAY[0], lambda m: log.info(m)), news_exit_test.due()),
                  ("Lab", lambda: lab.run(lambda m: log.info(m)), lab.due()),
                  ("Lab (300 stocks)", lambda: lab.run_big(lambda m: log.info(m)), lab.due(big=True)),
+                 ("Stop-loss test", lambda: stop_test.run(lambda m: log.info(m)), stop_test.due()),
                  ("Volume candles test", lambda: volume_bars_test.run(REPLAY[4], lambda m: log.info(m)), volume_bars_test.due()),
                  ("Headline-selling test (300 stocks)", lambda: news_exit_test.run(
                      REPLAY[0], lambda m: log.info(m), days=lab.BIG_YEARS * 365, symbols=lab.universe(), out=NEWS_EXIT_300,

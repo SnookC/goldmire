@@ -1,6 +1,6 @@
 {
-  "version": "1.6.6",
+  "version": "1.6.7",
   "notes": [
-    "Calendar fix: economic release times are right again after the clocks changed (they showed an hour early)."
+    "New background test: does Wren do better with a safety-net stop-loss (smart, 8%, 10% or 15%) than with none? 12, 60 and 300 stocks."
   ]
 }

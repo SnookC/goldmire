@@ -27,12 +27,15 @@ BIG_EVENTS = ("cpi", "consumer price", "pce", "ppi", "producer price", "nonfarm"
               "gdp", "retail sales", "ism manufacturing", "ism services", "ism non-manufacturing", "consumer confidence",
               "michigan consumer sentiment", "jolts", "durable goods orders", "powell")
 SKIP_EVENTS = ("gdpnow", "core durable", "reserve balances", "member", " prices", "employment", "new orders", "business activity",
-               "gdp price", "gdp sales", "dallas fed", "productivity", "4-week", "continuing", "excluding")
+               "gdp price", "gdp sales", "dallas fed", "productivity", "4-week", "continuing", "excluding",
+               "government payrolls", "manufacturing payrolls", "private nonfarm")
 ECONOMY_SHIFT_DAYS = 1      # Nasdaq's economic calendar for date D lists the events of the day BEFORE
                             # (found Oct 28 2026: asking for Oct 29 returned that day's Fed decision and
                             # GDPNow reading; asking for Oct 23 returned Thursday Oct 22's jobless claims)
-CAL_VERSION = 3
-NASDAQ_UTC_OFFSET_H = 4     # its "gmt" times are really UTC-4 all year (right in summer, an hour late in winter)
+CAL_VERSION = 4
+# Nasdaq writes every event's time in New York's offset as of TODAY (the day we ask), not the
+# event's own day: in late October it listed Nov 2's 10:00 ET release as 11:00. So the times
+# are converted from today's New York offset to the event day's.
 
 
 def _ny_time(day, hhmm):
@@ -40,8 +43,10 @@ def _ny_time(day, hhmm):
     try:
         from zoneinfo import ZoneInfo
         h, m = (int(x) for x in hhmm.split(":")[:2])
-        utc = datetime.fromisoformat(f"{day}T{h:02d}:{m:02d}:00+00:00") + timedelta(hours=NASDAQ_UTC_OFFSET_H)
-        return utc.astimezone(ZoneInfo("America/New_York")).strftime("%H:%M")
+        ny = ZoneInfo("America/New_York")
+        offset_now = -datetime.now(ny).utcoffset()                   # 4 h in summer, 5 h in winter
+        utc = datetime.fromisoformat(f"{day}T{h:02d}:{m:02d}:00+00:00") + offset_now
+        return utc.astimezone(ny).strftime("%H:%M")
     except Exception:  # noqa: BLE001
         return hhmm
 RETRY_AFTER_FAIL = 3600

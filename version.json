@@ -1,6 +1,6 @@
 {
-  "version": "1.6.5",
+  "version": "1.6.6",
   "notes": [
-    "Wren holds up to 12 stocks from now on (her 16 for the Fed days ends today)."
+    "Calendar fix: economic release times are right again after the clocks changed (they showed an hour early)."
   ]
 }

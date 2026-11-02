@@ -123,3 +123,12 @@ Results, round 7 and the big headline test (Oct 27 2026):
   Volume candles vs time candles, 60 stocks, 3 years of minute prices (IEX volume): every
   strategy FAILS on both. Bollinger bounce: time candles +$235 (beat 50% of random), volume
   candles +$76 (beat 10%). KEEP TIME CANDLES FOR WREN; nothing for Gareth.
+
+Stop-loss test for Wren (Nov 2 2026, stop_test.py; rule set before the run):
+                   12 stocks      60 stocks      300 stocks, 5 yrs (worst dip)
+  no stop ........ +$257          +$446          +$3,197  ($445)
+  smart stop ..... +$188          +$272          +$1,024  ($953)
+  8% stop ........ +$226          +$344          +$1,552  ($902)
+  10% stop ....... +$236          +$278          +$1,826  ($851)
+  15% stop ....... +$242          +$353          +$2,302  ($718)
+  KEEP NO STOP: every stop made less on every list, and even the worst losing stretch was deeper.

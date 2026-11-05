@@ -865,7 +865,7 @@ def retire_heroes(bots, memory):
             dst["savings"] = round(dst["savings"] + extra, 2)
         src["pot"] = 0.0
         scorecard.shift(memory, b["name"], -amount)
-        scorecard.shift(memory, to["name"], amount - extra)
+        scorecard.shift(memory, to["name"], amount)              # pot + savings both count on the Scorecard
         b["retired"], b["benched"] = True, True
         for k, v in (("retired", True), ("benched", True)):
             _save_bot_field(b["name"], k, v)

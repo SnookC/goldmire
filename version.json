@@ -1,6 +1,6 @@
 {
-  "version": "1.6.7",
+  "version": "1.6.8",
   "notes": [
-    "New background test: does Wren do better with a safety-net stop-loss (smart, 8%, 10% or 15%) than with none? 12, 60 and 300 stocks."
+    "Scorecard fix: once Wren's pot is at its $1,000 limit, her sale profits go to savings, and the Scorecard now counts them (it was missing $49)."
   ]
 }

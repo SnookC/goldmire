@@ -57,7 +57,9 @@ def shift(memory, name, amount):
 
 
 # one-time corrections for money moved before shift() existed
-FIXES = [("2026-10-28-gareth-spare", {"Stock-1": -219.41, "Stock-2": 219.41})]
+FIXES = [("2026-10-28-gareth-spare", {"Stock-1": -219.41, "Stock-2": 219.41}),
+         # Gareth's retirement put $14.21 over Wren's limit straight into her savings: a transfer, not a profit
+         ("2026-11-05-retire-extra", {"Stock-2": 14.21})]
 
 
 def apply_fixes(memory):
@@ -82,11 +84,12 @@ def update(memory, bots, positions, spy_now, today, norm, pot_of, log=print):
         held = {s: h for s, h in memory.get("held", {}).get(name, {}).items() if not h.get("hold")}   # your holds don't count
         unreal = sum(_f(getattr(positions.get(norm(s)), "unrealized_pl", 0)) for s in held if positions.get(norm(s)))
         pot = pot_of(b)
+        saved = _f(memory.get("bank", {}).get(name, {}).get("savings"))   # profit past the pot limit lands here
         st = starts.get(name)
         if not st or st.get("strategy") != b.get("strategy"):
             if not spy_now:
                 continue                                   # start once the S&P 500 price is known
-            st = starts[name] = {"day": today, "strategy": b.get("strategy"), "pot": round(pot, 2),
+            st = starts[name] = {"day": today, "strategy": b.get("strategy"), "pot": round(pot, 2), "savings": round(saved, 2),
                                  "unreal": round(unreal, 2), "spy": spy_now}
         trades = [e for e in memory.get("journal", []) if e.get("side") == "sell" and e.get("bot") == name
                   and str(e.get("t", ""))[:10] >= st["day"] and "owner hold" not in str(e.get("reason", ""))]
@@ -95,7 +98,8 @@ def update(memory, bots, positions, spy_now, today, norm, pot_of, log=print):
         rets = [_f(e.get("pl")) / _f(e.get("cost")) for e in trades if _f(e.get("cost")) > 0]
         yours = sum(_f(e.get("pl")) for e in memory.get("journal", []) if e.get("side") == "sell" and e.get("bot") == name
                     and str(e.get("t", ""))[:10] >= st["day"] and "owner hold" in str(e.get("reason", "")))
-        result = round((pot - st["pot"]) + (unreal - st["unreal"]) - yours, 2)      # your holds' sales aren't the trader's
+        result = round((pot - st["pot"]) + (saved - st.get("savings", 0.0)) + (unreal - st["unreal"]) - yours, 2)
+        # (pot + savings: once the pot is at its limit, sale profits go to savings; your holds' sales aren't the trader's)
         spy_ret = (spy_now / st["spy"] - 1) if spy_now and st.get("spy") else None
         tested = _tested(b.get("strategy"))
         live_win = wins / n if n else None

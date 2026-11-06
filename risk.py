@@ -203,7 +203,8 @@ def _f(x):
 
 def heroes_day_pl(memory, positions, today, day_of, norm):
     """Today's result for all heroes: finished trades today + today's move in what they still hold."""
-    snap, snap_day = memory.get("close_values", {}), memory.get("close_values_day", "")
+    from execution import prior_snapshot
+    snap, snap_day = prior_snapshot(memory, today)
     closed = 0.0
     for e in memory.get("journal", []):
         if e.get("side") != "sell" or day_of(e.get("t")) != today:

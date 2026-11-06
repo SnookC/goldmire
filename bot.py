@@ -1791,6 +1791,7 @@ def _run(TradingClient, StockHistoricalDataClient, CryptoHistoricalDataClient, S
     apply_pot_topups(memory, bots)
     apply_pot_moves(memory, bots)
     scorecard.apply_fixes(memory)
+    execution.apply_fixes(memory)
     validator.review(bots, memory, log.info)
     taught = {}
     for b, k, v in TRAINING:

@@ -1,6 +1,6 @@
 {
-  "version": "1.6.8",
+  "version": "1.6.9",
   "notes": [
-    "Scorecard fix: once Wren's pot is at its $1,000 limit, her sale profits go to savings, and the Scorecard now counts them (it was missing $49)."
+    "Fix: a restart after the market closes no longer makes Ysolde mis-measure that day's sales. Yesterday's $25 \"unexplained\" alert was this bug, not real money, and its record is corrected."
   ]
 }

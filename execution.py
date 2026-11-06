@@ -54,6 +54,30 @@ def _f(x):
         return 0.0
 
 
+def prior_snapshot(memory, today):
+    """The closing values saved on the last check BEFORE today: ({symbol: value}, day) or ({}, "").
+    (A check after today's close saves today's values; a second check that evening, e.g. after a
+    restart, must still measure today's sales from yesterday's values, so the one before is kept.)"""
+    for vals, day in ((memory.get("close_values"), memory.get("close_values_day", "")),
+                      (memory.get("close_values_prev"), memory.get("close_values_prev_day", ""))):
+        if day and day < today and vals is not None:
+            return vals, day
+    return {}, ""
+
+
+# one-time corrections of daily checks spoiled by the same-evening restart bug (fixed Nov 6 2026)
+RECONCILE_FIXES = {"2026-11-05": {"bad_unexplained": -25.06, "account_change": -45.59, "heroes": -44.07,
+                                  "heroes_closed": 6.56, "heroes_open": -50.63, "unexplained": -1.52}}
+
+
+def apply_fixes(memory):
+    for day, fix in RECONCILE_FIXES.items():
+        rec = memory.get("reconcile", {}).get(day)
+        if rec and rec.get("unexplained") == fix["bad_unexplained"]:
+            rec.update({k: v for k, v in fix.items() if k != "bad_unexplained"})
+            rec["corrected"] = "the evening re-check after a restart measured the day's sales wrongly (fixed in 1.6.9)"
+
+
 def reconcile(trading, memory, positions, today, day_of, norm, market_open=False, log=print):
     """Compare Goldmire's records with Alpaca's. Returns the findings (also kept in memory).
 
@@ -68,8 +92,7 @@ def reconcile(trading, memory, positions, today, day_of, norm, market_open=False
     except Exception as e:  # noqa: BLE001
         log(f"Ysolde: couldn't read the account for the daily check ({e})")
         account_change = None
-    snap = memory.get("close_values", {})                       # {symbol: value at the last check}
-    snap_day = memory.get("close_values_day", "")
+    snap, snap_day = prior_snapshot(memory, today)             # {symbol: value at the last check before today}
     closed = 0.0
     for e in memory.get("journal", []):
         if e.get("side") != "sell" or day_of(e.get("t")) != today:
@@ -88,7 +111,10 @@ def reconcile(trading, memory, positions, today, day_of, norm, market_open=False
     memory.setdefault("reconcile", {})[today] = found
     for d in sorted(memory["reconcile"])[:-30]:                 # keep a month
         memory["reconcile"].pop(d, None)
-    if snap_day != today and not market_open:                   # closing values, to measure tomorrow's sales from
+    if memory.get("close_values_day", "") != today and not market_open:   # closing values, to measure tomorrow's sales from
+        if memory.get("close_values_day"):
+            memory["close_values_prev"] = memory.get("close_values", {})
+            memory["close_values_prev_day"] = memory["close_values_day"]
         memory["close_values"] = {s: round(_f(getattr(p, "market_value", 0)), 2) for s, p in positions.items()}
         memory["close_values_day"] = today
     line = (f"Ysolde: daily check {today}: account ${account_change:+,.2f}" if account_change is not None

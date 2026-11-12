@@ -152,6 +152,10 @@ h2 small { font-weight: 500; color: var(--ink-3); font-size: 11.5px; }
 .card.flat:hover { transform: none; }
 .card.dark { background: var(--card-dark); }
 @keyframes cardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+/* updates (1.7): only new things move. A new headline or trade slides in; everything else stays still. */
+.fresh { animation: freshIn .6s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes freshIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+.card.fresh { animation: cardIn .5s cubic-bezier(.2,.8,.2,1) both; }
 .lbl { font-size: 12px; color: var(--ink-2); font-weight: 500; display: flex; align-items: center; gap: 8px; }
 .lbl .ic { width: 26px; height: 26px; border-radius: 9px; display: grid; place-items: center; background: rgba(255,255,255,.55); }
 .lbl .ic svg { width: 14px; height: 14px; }
@@ -450,17 +454,74 @@ tr:last-child td { border-bottom: 0; } td.n, th.n { text-align: right; font-vari
       <div style="position:absolute;inset:0;display:grid;place-items:center;text-align:center;pointer-events:none"><div><div style="font-weight:700;font-size:15px">${center}</div><div style="font-size:10px;color:var(--ink-3)">${sub}</div></div></div>`;
   }
 
+  // ---------- smooth updates (1.7) ----------
+  // A refresh used to throw the whole page away and rebuild it, so every card replayed its entrance
+  // animation every 15 seconds. Now the new page is compared with what's on screen and only the parts that
+  // changed are touched. Rows with a data-k key keep their identity, so a new headline slides in at the top
+  // instead of every row's text changing.
+  function morph(el, html) {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = html;
+    patchKids(el, tpl.content);
+  }
+  const keyOf = x => x.nodeType === 1 ? x.getAttribute("data-k") : null;
+  function fresh(node) {
+    if (node.nodeType === 1 && (node.classList.contains("row") || node.classList.contains("tile") || node.classList.contains("card") || node.classList.contains("cal")))
+      node.classList.add("fresh");
+    return node;
+  }
+  function patchNode(x, y) {
+    if (x.nodeType === 3 || x.nodeType === 8) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; return; }
+    for (const a of [...x.attributes]) if (!y.hasAttribute(a.name) && !(a.name === "class" && x.classList.contains("fresh"))) x.removeAttribute(a.name);
+    for (const a of [...y.attributes]) {
+      let v = a.value;
+      if (a.name === "class" && x.classList.contains("fresh")) v += " fresh";        // let a sliding-in row finish
+      if (x.getAttribute(a.name) !== v) x.setAttribute(a.name, v);
+    }
+    patchKids(x, y);
+  }
+  const same = (x, y) => x.nodeType === y.nodeType && x.nodeName === y.nodeName && keyOf(x) === keyOf(y);
+  function patchKids(a, b) {
+    const nb = [...b.childNodes];
+    if (nb.some(y => keyOf(y) != null)) {                       // a keyed list: match rows by their key
+      const old = new Map(), loose = [];
+      for (const c of a.childNodes) if (keyOf(c) != null) old.set(keyOf(c), c); else loose.push(c);
+      const keep = new Set();
+      let ref = a.firstChild;
+      for (const y of nb) {
+        let x = keyOf(y) != null ? old.get(keyOf(y)) : loose.find(c => !keep.has(c) && same(c, y));   // unkeyed (a title): reuse in order
+        if (x && same(x, y)) patchNode(x, y); else x = fresh(y.cloneNode(true));
+        keep.add(x);
+        if (x === ref) ref = ref.nextSibling; else a.insertBefore(x, ref);
+      }
+      for (const c of [...a.childNodes]) if (!keep.has(c)) a.removeChild(c);
+      return;
+    }
+    const na = [...a.childNodes];
+    nb.forEach((y, i) => {
+      const x = na[i];
+      if (!x) a.appendChild(fresh(y.cloneNode(true)));
+      else if (!same(x, y)) a.replaceChild(fresh(y.cloneNode(true)), x);
+      else patchNode(x, y);
+    });
+    for (let i = na.length - 1; i >= nb.length; i--) a.removeChild(na[i]);
+  }
+  const drawn = {};      // page -> the html last put on screen
+
   // ---------- render ----------
   function render() {
     if (!page) return;
     greet(); ask();
     const fn = { overview, activity, heroes, guardians: guardiansPage, reports, calendar }[page];
     const el = $("p-" + page);
-    if (!S) { el.innerHTML = `<div class="ph"><div><h1>${esc(PAGES.find(p => p[0] === page)[1])}</h1><p class="sub">${live === false ? "Can't reach Goldmire. Is the PC on and Goldmire running?" : "Loading…"}</p></div></div>`; return; }
+    if (!S) { el.innerHTML = `<div class="ph"><div><h1>${esc(PAGES.find(p => p[0] === page)[1])}</h1><p class="sub">${live === false ? "Can't reach Goldmire. Is the PC on and Goldmire running?" : "Loading…"}</p></div></div>`; drawn[page] = null; return; }
+    const html = fn();
+    if (html === drawn[page]) return;                  // nothing changed: leave the screen alone
     const keep = $("scroll").scrollTop;
-    el.innerHTML = fn();
+    if (drawn[page]) morph(el, html); else el.innerHTML = html;
+    drawn[page] = html;
     $("scroll").scrollTop = keep;
-    el.querySelectorAll(".card").forEach((c, i) => c.style.setProperty("--i", i));
+    el.querySelectorAll(".card").forEach((c, i) => { if (c.style.getPropertyValue("--i") !== String(i)) c.style.setProperty("--i", i); });
     bindPage(el);
   }
   function greet() {
@@ -515,36 +576,36 @@ tr:last-child td { border-bottom: 0; } td.n, th.n { text-align: right; font-vari
         <div class="card"><h2>Daily results <small>closed trades, last ${Math.max(dailyRows().length, 1)} days · today in coral</small></h2>${bars(dailyRows())}
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><span class="chip up">${wins} won today</span><span class="chip dn">${losses} lost today</span></div></div>
         <div class="card"><h2>Heroes <small>pot vs limit</small></h2>
-          <div class="rows">${ts.map(b => `<div class="row" style="grid-template-columns:56px 1fr auto">${ring((b.bank?.pot || 0) / (b.bank?.limit || 1000), "", "", 52)}
+          <div class="rows">${ts.map(b => `<div class="row" data-k="${esc(b.name)}" style="grid-template-columns:56px 1fr auto">${ring((b.bank?.pot || 0) / (b.bank?.limit || 1000), "", "", 52)}
             <div><div class="t"><b>${esc(heroName(b))}</b></div><div class="s">${esc(b.strategy_name)} · ${b.positions.length} held · Bram: ${esc(b.verdict || "—")}</div></div>
             <div class="v num">${money(b.bank?.pot)}<div class="s ${cls(b.pl)}">${usd(b.pl)} all time</div></div></div>`).join("") || `<div class="empty">No traders working.</div>`}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${guardians().map(g => `<span class="chip">${svg("shield", 2).replace("<svg", '<svg width="12" height="12"')} ${esc(firstName(heroName(g)))}</span>`).join("")}</div></div>
       </div>
       <div class="grid g2" style="margin-top:14px">
-        <div class="card"><h2>Coming up <button class="btn ghost" data-p="calendar" type="button">Calendar</button></h2>${cal.map(c => `<div class="cal"><div class="d"><small>${new Date(c.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })}</small>${new Date(c.date + "T12:00:00").getDate()}</div><div><div class="t"><b>${esc(c.title)}</b></div><div class="s" style="font-size:11.5px;color:var(--ink-3)">${esc(c.sub)}</div></div><span></span></div>`).join("") || `<div class="empty">Nothing big on the calendar.</div>`}</div>
-        <div class="card"><h2>Town Crier <small>big headlines</small></h2><div class="rows">${(S.news?.crier || []).slice(0, 5).map(c => `<div class="row"><div class="av ${c.tone > 0 ? "up" : "dn"}">${esc((c.symbols || [])[0] || "")}</div><div><div class="t">${esc(c.headline)}</div><div class="s">${timeOf(c.time)}</div></div><span class="chip ${c.tone > 0 ? "up" : "dn"}">${c.tone > 0 ? "good" : "bad"}</span></div>`).join("") || `<div class="empty">Quiet so far.</div>`}</div></div>
+        <div class="card"><h2>Coming up <button class="btn ghost" data-p="calendar" type="button">Calendar</button></h2>${cal.map(c => `<div class="cal" data-k="${esc(c.date + "|" + c.title)}"><div class="d"><small>${new Date(c.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })}</small>${new Date(c.date + "T12:00:00").getDate()}</div><div><div class="t"><b>${esc(c.title)}</b></div><div class="s" style="font-size:11.5px;color:var(--ink-3)">${esc(c.sub)}</div></div><span></span></div>`).join("") || `<div class="empty">Nothing big on the calendar.</div>`}</div>
+        <div class="card"><h2>Town Crier <small>big headlines</small></h2><div class="rows">${(S.news?.crier || []).slice(0, 5).map(c => `<div class="row" data-k="${esc(c.time + "|" + c.headline)}"><div class="av ${c.tone > 0 ? "up" : "dn"}">${esc((c.symbols || [])[0] || "")}</div><div><div class="t">${esc(c.headline)}</div><div class="s">${timeOf(c.time)}</div></div><span class="chip ${c.tone > 0 ? "up" : "dn"}">${c.tone > 0 ? "good" : "bad"}</span></div>`).join("") || `<div class="empty">Quiet so far.</div>`}</div></div>
       </div>`;
   }
 
   function activity() {
     const t = S.today || {};
-    const sold = (t.closed || []).map(x => ({ t: x.time, html: `<div class="row"><div class="av ${cls(x.pl)}">${x.pl >= 0 ? "▲" : "▼"}</div>
+    const sold = (t.closed || []).map(x => ({ t: x.time, html: `<div class="row" data-k="${esc("s|" + x.time + "|" + x.symbol)}"><div class="av ${cls(x.pl)}">${x.pl >= 0 ? "▲" : "▼"}</div>
       <div><div class="t"><b>Sold ${esc(x.symbol)}</b> · ${esc(firstName(x.hero))}</div><div class="s">${timeOf(x.time)} · paid $${n(+x.paid).toFixed(2)} → $${n(+x.sold).toFixed(2)} · ${esc(x.why)}${x.reason ? " " + esc(x.reason) : ""}</div></div><div class="v num ${cls(x.pl)}">${usd(x.pl)}</div></div>` }));
-    const bought = (t.buys || []).map(x => ({ t: x.time, html: `<div class="row"><div class="av buy">+</div>
+    const bought = (t.buys || []).map(x => ({ t: x.time, html: `<div class="row" data-k="${esc("b|" + x.time + "|" + x.symbol)}"><div class="av buy">+</div>
       <div><div class="t"><b>Bought ${esc(x.symbol)}</b> · ${esc(firstName(x.hero))}</div><div class="s">${timeOf(x.time)}${x.price ? ` · about $${n(x.price).toFixed(2)} a share` : ""}</div></div><div class="v num">${money(x.dollars)}</div></div>` }));
     const all = [...sold, ...bought].sort((a, b) => String(b.t).localeCompare(String(a.t))).map(x => x.html).join("");
-    const past = IDX.slice(0, 12).map(d => `<div class="row"><div class="av ${cls(d.closed_pl)}">${new Date(d.day + "T12:00:00").getDate()}</div><div><div class="t"><b>${dayShort(d.day)}</b></div><div class="s">${esc(d.headline)}</div></div><div class="v num ${cls(d.closed_pl)}">${usd(d.closed_pl)}</div></div>`).join("");
+    const past = IDX.slice(0, 12).map(d => `<div class="row" data-k="${esc(d.day)}"><div class="av ${cls(d.closed_pl)}">${new Date(d.day + "T12:00:00").getDate()}</div><div><div class="t"><b>${dayShort(d.day)}</b></div><div class="s">${esc(d.headline)}</div></div><div class="v num ${cls(d.closed_pl)}">${usd(d.closed_pl)}</div></div>`).join("");
     return `<div class="ph"><div><h1>Activity</h1><p class="sub">Every buy and sale today, the big headlines, and how each day went.</p></div></div>
       <div class="grid g-main">
         <div class="card"><h2>Today <small>${(t.closed || []).length} sold · ${(t.buys || []).length} bought</small></h2><div class="rows">${all || `<div class="empty">No trades yet today.</div>`}</div></div>
-        <div class="card"><h2>Town Crier</h2><div class="rows">${(S.news?.crier || []).slice(0, 8).map(c => `<div class="row"><div class="av ${c.tone > 0 ? "up" : "dn"}">${esc((c.symbols || [])[0] || "")}</div><div><div class="t">${esc(c.headline)}</div><div class="s">${timeOf(c.time)} · ${esc((c.symbols || []).join(", "))}</div></div><span></span></div>`).join("") || `<div class="empty">Quiet so far.</div>`}</div></div>
+        <div class="card"><h2>Town Crier</h2><div class="rows">${(S.news?.crier || []).slice(0, 8).map(c => `<div class="row" data-k="${esc(c.time + "|" + c.headline)}"><div class="av ${c.tone > 0 ? "up" : "dn"}">${esc((c.symbols || [])[0] || "")}</div><div><div class="t">${esc(c.headline)}</div><div class="s">${timeOf(c.time)} · ${esc((c.symbols || []).join(", "))}</div></div><span></span></div>`).join("") || `<div class="empty">Quiet so far.</div>`}</div></div>
       </div>
       <div class="card" style="margin-top:14px"><h2>Past days <a class="btn ghost" href="town.html" style="text-decoration:none">Full ledger &amp; exports</a></h2><div class="rows">${past || `<div class="empty">The first daily report is saved at 4:05 PM New York time.</div>`}</div></div>`;
   }
 
   function verdictChip(v) { return v ? `<span class="chip ${v === "PASS" ? "up" : v === "CONDITIONAL" ? "amber" : "dn"}">Bram: ${esc(v)}</span>` : ""; }
   function holdTiles(b) {
-    return `<div class="tiles">${b.positions.map(p => `<div class="tile"><div class="sy">${esc(p.symbol)}${p.hold ? `<span class="chip coral">HOLD</span>` : p.earnings && p.earnings.date >= todayNY() ? `<span class="chip amber" title="Earnings ${esc(dayShort(p.earnings.date))} ${esc(p.earnings.when)}">E ${esc(dayShort(p.earnings.date, true))}</span>` : ""}</div>
+    return `<div class="tiles">${b.positions.map(p => `<div class="tile" data-k="${esc(p.symbol)}"><div class="sy">${esc(p.symbol)}${p.hold ? `<span class="chip coral">HOLD</span>` : p.earnings && p.earnings.date >= todayNY() ? `<span class="chip amber" title="Earnings ${esc(dayShort(p.earnings.date))} ${esc(p.earnings.when)}">E ${esc(dayShort(p.earnings.date, true))}</span>` : ""}</div>
       <div class="pl num ${cls(p.pl)}">${p.pending ? "filling…" : usd(p.pl)}</div><div class="c">${money(p.cost)} in</div></div>`).join("")}</div>`;
   }
   function heroes() {

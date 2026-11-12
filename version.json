@@ -1,6 +1,7 @@
 {
-  "version": "1.6.9",
+  "version": "1.7.0",
   "notes": [
-    "Fix: a restart after the market closes no longer makes Ysolde mis-measure that day's sales. Yesterday's $25 \"unexplained\" alert was this bug, not real money, and its record is corrected."
+    "Start with Windows: run Goldmire in the background once and from then on it starts by itself, with no window, whenever you sign in (it waits for the internet first). Right-click the icon by the clock to turn it off.",
+    "Works on a PC where Goldmire was copied over without the installer."
   ]
 }

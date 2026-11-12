@@ -426,7 +426,7 @@ GOLDMIRE ON YOUR PHONE (works anywhere, private)
                    Android (Chrome): menu > Add to Home screen / Install app.
   Tap the Goldmire icon any time. Your PC must be on with Goldmire running for
   live numbers; if it isn't, the app shows the last report and says so.
-  Tip: tick "Start Goldmire when I sign in" in the installer to keep it running.
+  Tip: keep "Start with Windows" ticked (right-click the icon by the clock) to keep it running.
   To stop sharing: 4_phone_access.bat stop
 
 FIRST-TIME STEPS (Claude will walk you through each one):
@@ -438,6 +438,13 @@ FIRST-TIME STEPS (Claude will walk you through each one):
   5. Double-click Goldmire on the desktop      -> runs in the background (icon by the clock)
   Without the installer: unzip, then 1_setup.bat, open_keys_file.bat,
   2_check_connection.bat and 3_run_bot.bat (or 5_run_in_background.bat) do the same steps.
+
+START WITH WINDOWS (1.7)
+  Run Goldmire in the background (5_run_in_background.bat, or the Goldmire icon) once:
+  from then on it starts by itself, with no window, every time you sign in to Windows,
+  even if you copied the folder to a new PC without the installer. After a restart it
+  waits for the internet before connecting. Right-click the icon by the clock and untick
+  "Start with Windows" to turn this off (your choice is kept in autostart.json).
 
 SAFETY
   * The bots are locked to paper trading. They refuse real-money keys.

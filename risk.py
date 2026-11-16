@@ -58,6 +58,13 @@ FUNDS = {
     "FXI": "International", "EWJ": "International", "VEA": "International", "VWO": "International",
     "TLT": "Bonds", "IEF": "Bonds", "HYG": "Bonds", "LQD": "Bonds", "AGG": "Bonds",
 }
+# Funds that hold Bitcoin or Ether (spot or futures, incl. 2x) count as Crypto, like BTC/USD itself (1.7.1).
+# Before this, each one was "its own industry", so two Bitcoin funds never added up against the 50% limit.
+# Inverse (short) funds are left out: they bet the other way.
+CRYPTO_FUNDS = ["IBIT", "FBTC", "GBTC", "BTC", "ARKB", "BITB", "HODL", "BRRR", "BTCO", "EZBC", "BTCW", "DEFI",
+                "BITO", "BTF", "BITX", "BITU", "ETHA", "FETH", "ETHE", "ETH", "ETHW", "CETH", "ETHV", "QETH",
+                "EZET", "EETH", "ETHU"]
+FUNDS.update({s: "Crypto" for s in CRYPTO_FUNDS})
 
 
 def sector_for_sic(sic):

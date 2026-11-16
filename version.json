@@ -1,8 +1,6 @@
 {
-  "version": "1.7.0",
+  "version": "1.7.1",
   "notes": [
-    "Start with Windows: run Goldmire in the background once and from then on it starts by itself, with no window, whenever you sign in (it waits for the internet first). Right-click the icon by the clock to turn it off.",
-    "Works on a PC where Goldmire was copied over without the installer.",
-    "Smoother dashboard: a refresh only changes what's new. New headlines and trades slide in at the top; the rest of the page no longer re-animates every 15 seconds."
+    "Pip now knows Bitcoin and Ether funds (IBIT, BITO, FBTC, ETHA and others) are all crypto, so together they count against the 50%-per-industry limit. Before, each one counted as its own industry. Nothing is sold because of this; it only limits new buys."
   ]
 }

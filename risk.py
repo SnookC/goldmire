@@ -67,6 +67,12 @@ CRYPTO_FUNDS = ["IBIT", "FBTC", "GBTC", "BTC", "ARKB", "BITB", "HODL", "BRRR", "
 FUNDS.update({s: "Crypto" for s in CRYPTO_FUNDS})
 
 
+def is_crypto_fund(symbol):
+    """True for a fund that holds Bitcoin or Ether. Crypto trading stopped on Oct 13 2026, so stock heroes
+    don't buy these either (1.7.2) unless a hero has "allow_crypto_funds": true in bots.json."""
+    return str(symbol).upper() in CRYPTO_FUNDS
+
+
 def sector_for_sic(sic):
     """Broad industry from a 4-digit SIC code."""
     try:
@@ -250,6 +256,9 @@ def cap_buy(bot, memory, positions, symbol, dollars, pots, benched, norm, log):
         allowed = stock_cap
     if bot.get("kind") == "crypto" or "/" in symbol:
         return round(allowed, 2)
+    if is_crypto_fund(norm(symbol)) and not bot.get("allow_crypto_funds"):
+        log(f"[{name}] Pip: {symbol} skipped: it's a Bitcoin/Ether fund, and crypto trading stopped on Oct 13")
+        return 0.0
     working = [n for n in pots if n not in benched]
     combined = sum(_f(pots[n]) for n in working)
     if combined <= 0:

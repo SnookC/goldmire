@@ -1,6 +1,7 @@
 {
-  "version": "1.7.1",
+  "version": "1.7.2",
   "notes": [
-    "Pip now knows Bitcoin and Ether funds (IBIT, BITO, FBTC, ETHA and others) are all crypto, so together they count against the 50%-per-industry limit. Before, each one counted as its own industry. Nothing is sold because of this; it only limits new buys."
+    "No crypto through the back door: stock heroes no longer buy funds that hold Bitcoin or Ether (IBIT, BITO, FBTC, ETHA...), since crypto trading stopped on Oct 13. Wren keeps the IBIT and BITO she already has until her normal rules sell them.",
+    "Pip counts Bitcoin and Ether funds as one Crypto industry (from 1.7.1)."
   ]
 }

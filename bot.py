@@ -1017,6 +1017,18 @@ def run_bot(bot, rnd, memory):
     if blocked:
         log.info(f"[{name}] skipping {', '.join(blocked)}: fresh bad news")
         candidates = [s for s in candidates if s not in blocked]
+    if kind != "crypto" and not bot.get("allow_crypto_funds"):
+        # no crypto since Oct 13, and that includes funds that hold Bitcoin/Ether (IBIT, BITO...): 1.7.2
+        cf = [s for s in candidates if risk.is_crypto_fund(norm(s))]
+        if cf:
+            candidates = [s for s in candidates if s not in cf]
+            seen = memory.setdefault("risk", {}).setdefault("crypto_fund_skip", {})
+            today = report.ny().strftime("%Y-%m-%d")
+            new = [s for s in cf if seen.get(f"{name}|{s}") != today]
+            for s in new:
+                seen[f"{name}|{s}"] = today
+            if new:
+                log.info(f"[{name}] skipping {', '.join(new)}: Bitcoin/Ether funds (no crypto since Oct 13; held ones are sold by the hero's normal rules)")
     if not candidates:
         log.info(f"[{name}] nothing new to look at this round")
         return

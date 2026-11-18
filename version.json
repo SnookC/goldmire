@@ -1,7 +1,7 @@
 {
-  "version": "1.8.1",
+  "version": "1.8.2",
   "notes": [
-    "The swap rule is built but switched off until a test on 5 years of prices shows whether it helps.",
-    "Stock heroes don't buy Bitcoin/Ether funds (from 1.7.2)."
+    "New background test: what Wren should do when all 12 slots are full (keep skipping, your swap, a 20-day time limit, or swapping the nearly-done one), on 300 stocks over 5 years. Results show up in the log as 'Slots test'.",
+    "The swap rule stays off until the test decides."
   ]
 }

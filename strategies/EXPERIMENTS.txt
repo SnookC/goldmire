@@ -139,3 +139,6 @@ OWNER RULE, Nov 18 2026: Wren's swaps (not a tested idea)
   one bought the same day, max 2 a day). Not back-tested: the test engine scores each stock on its own
   and doesn't model full slots. Judge it live: swap trades are marked "swapped out for" in the journal,
   so the scorecard can show what the sold stocks did afterwards vs what was bought.
+  UPDATE (same day): switched OFF before it ever went live. slots_test.py replays Wren's 12 slots on
+  300 stocks x 5 years and compares: now / the owner's swap / a 20-day time limit / swapping the
+  nearly-done one. The rule for a winner is written at the top of slots_test.py.

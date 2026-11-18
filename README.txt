@@ -445,7 +445,7 @@ SWAPS: MAKING ROOM FOR A GOOD NEW STOCK (1.8)
   and buys the new one. She never sells one at a loss, one she bought the same day, or one of
   your own holds, and switches at most 2 a day (one per check). The log says "SWAP:" when it
   happens. Turned on Nov 18 2026 after it won the slots test (more money than skipping, in 27 of 30
-  replays; 3 or 4 a day were no reliably better than 2). To turn it off, set "swap_green": false for Stock-2.
+  replays; 3 or 4 a day were not reliably better than 2). To turn it off, set "swap_green": false for Stock-2.
 
 START WITH WINDOWS (1.7)
   Run Goldmire in the background (5_run_in_background.bat, or the Goldmire icon) once:

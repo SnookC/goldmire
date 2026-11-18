@@ -663,7 +663,7 @@ def swap_candidate(bot, memory, rnd, held):
     if not bot.get("swap_green"):
         return None
     today = report.ny().strftime("%Y-%m-%d")
-    if memory.get("swaps", {}).get(bot["name"], {}).get(today, 0) >= SWAPS_PER_DAY:
+    if memory.get("swaps", {}).get(bot["name"], {}).get(today, 0) >= int(bot.get("swaps_per_day", SWAPS_PER_DAY)):
         return None
     local_today = datetime.now().strftime("%Y-%m-%d")
     green = []
@@ -1719,7 +1719,7 @@ def maybe_news_replay(memory):
                  ("Headline-selling test", lambda: news_exit_test.run(REPLAY[0], lambda m: log.info(m)), news_exit_test.due()),
                  ("Lab", lambda: lab.run(lambda m: log.info(m)), lab.due()),
                  ("Lab (300 stocks)", lambda: lab.run_big(lambda m: log.info(m)), lab.due(big=True)),
-                 ("Slots test", lambda: slots_test.run(lambda m: log.info(m)), slots_test.due()),
+                 ("Slots test", lambda: slots_test.run_all(lambda m: log.info(m)), slots_test.due()),
                  ("Stop-loss test", lambda: stop_test.run(lambda m: log.info(m)), stop_test.due()),
                  ("Volume candles test", lambda: volume_bars_test.run(REPLAY[4], lambda m: log.info(m)), volume_bars_test.due()),
                  ("Headline-selling test (300 stocks)", lambda: news_exit_test.run(

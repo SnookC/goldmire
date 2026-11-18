@@ -27,6 +27,12 @@ THE RULE: a version replaces "now" only if, averaged over the 30 orders, it
   2. makes more in the exam (the most recent 30% of the time), AND
   3. beats "now" in at least 60% of the 30 orders.
 If more than one qualifies, the one that makes the most wins. Otherwise Wren keeps doing what she does.
+
+FOLLOW-UP (Nov 18 2026, after "your swap" won, before testing): the owner asked about 3 or 4 swaps a day
+instead of 2. run_limits() replays "your swap" with 2 (the winner), 3 and 4 a day, the same 30 orders.
+A higher limit replaces 2 only if it makes at least 5% more money than 2 a day, makes more in the exam,
+and beats 2 a day in at least 60% of the orders; if both qualify, the one that makes the most wins.
+6 a day and no limit are shown for information only.
 The 10- and 40-day time limits are also shown, for information only (they can't win).
 Not modelled (the same for every version): news exits, Pip's limits, the crypto-fund block.
 """
@@ -39,6 +45,8 @@ import backtest
 import lab
 
 OUT_JSON = os.path.join(backtest.OUT_DIR, "slots_test.json")
+OUT_LIMITS = os.path.join(backtest.OUT_DIR, "slots_test_limits.json")
+LIMITS = [(2, True), (3, True), (4, True), (6, False), (99, False)]    # (swaps a day, counts for the decision?)
 SLOTS = 12
 POT = 1000.0
 SEEDS = 30
@@ -56,7 +64,7 @@ VARIANTS = [  # (name, swap kind, time limit in trading days, counts for the dec
 
 
 def due():
-    return not os.path.exists(OUT_JSON)
+    return not os.path.exists(OUT_JSON) or not os.path.exists(OUT_LIMITS)
 
 
 def prepare(data):
@@ -95,7 +103,7 @@ def prepare(data):
     return prep, buys_on, dates
 
 
-def simulate(prep, buys_on, dates, swap=None, limit=None, seed=0, cost=None):
+def simulate(prep, buys_on, dates, swap=None, limit=None, seed=0, cost=None, per_day=SWAPS_PER_DAY):
     """One run of the 12 slots. Returns money made, the exam part, worst drop, trades and how often she missed out."""
     cost = backtest.COST["stock"] if cost is None else cost
     rng = random.Random(seed)
@@ -146,7 +154,7 @@ def simulate(prep, buys_on, dates, swap=None, limit=None, seed=0, cost=None):
                         key = -((price - pos["raw"]) / (m - pos["raw"])) if m and m > pos["raw"] else -9.0   # least bounce left first
                     green.append((key, sym))
                 green.sort()
-                n_sw = min(len(green), SWAPS_PER_DAY, len(rest))
+                n_sw = min(len(green), per_day, len(rest))
                 for (_, out), new in zip(green[:n_sw], rest[:n_sw]):
                     sells[out] = "swap"
                     take.append(new)
@@ -177,6 +185,56 @@ def simulate(prep, buys_on, dates, swap=None, limit=None, seed=0, cost=None):
             "missed": missed, "swaps": swaps, "full_days": full_days,
             "time_limit_sales": sum(1 for t in trades if t["why"] == "time limit"),
             "time_limit_pl": sum(t["pl"] for t in trades if t["why"] == "time limit")}
+
+
+def _data(log):
+    return backtest.fetch_history("stock", "1Day", log, symbols=lab.universe(), tag="300", days=lab.BIG_YEARS * 365 + 350)
+
+
+def run_all(log=print):
+    """Whatever is still due: the main test, then the swaps-a-day follow-up."""
+    data = None
+    if not os.path.exists(OUT_JSON):
+        data = _data(log)
+        run(log, data)
+    if not os.path.exists(OUT_LIMITS):
+        run_limits(log, data or _data(log))
+
+
+def run_limits(log=print, data=None, seeds=SEEDS):
+    data = data if data is not None else _data(log)
+    prep, buys_on, dates = prepare(data)
+    log(f"Slots test (follow-up): your swap with {', '.join(str(n) if n < 99 else 'no limit' for n, _ in LIMITS)} switches a day")
+    res = {}
+    for n, _ in LIMITS:
+        runs = [simulate(prep, buys_on, dates, "smallest", None, seed, per_day=n) for seed in range(seeds)]
+        avg = {k: round(sum(r[k] for r in runs) / len(runs), 2) for k in runs[0]}
+        avg["runs_pl"] = [round(r["pl"], 2) for r in runs]
+        name = f"{n} a day" if n < 99 else "no limit"
+        res[name] = avg
+        log(f"    {name}: ${avg['pl']:+,.2f} (exam ${avg['exam_pl']:+,.2f}), {avg['trades']:.0f} trades, {avg['win_rate']:.0%} won, "
+            f"worst drop ${avg['max_drawdown']:,.2f}, {avg['swaps']:.0f} swaps")
+    base = res["2 a day"]
+    ok = []
+    for n, counts in LIMITS[1:]:
+        name = f"{n} a day" if n < 99 else "no limit"
+        r = res[name]
+        r["beats_2_share"] = round(sum(1 for a, b in zip(r["runs_pl"], base["runs_pl"]) if a > b) / len(base["runs_pl"]), 2)
+        if counts and (r["pl"] > base["pl"] and r["pl"] >= base["pl"] + abs(base["pl"]) * MARGIN
+                       and r["exam_pl"] > base["exam_pl"] and r["beats_2_share"] >= WIN_SHARE):
+            ok.append(name)
+    best = max(ok, key=lambda k: res[k]["pl"]) if ok else "2 a day"
+    verdict = f"USE {best.upper()}" if ok else "KEEP 2 A DAY"
+    why = (f"{best} made ${res[best]['pl']:+,.2f} vs ${base['pl']:+,.2f} with 2 a day (exam ${res[best]['exam_pl']:+,.2f} vs "
+           f"${base['exam_pl']:+,.2f}), better in {res[best]['beats_2_share']:.0%} of the orders" if ok else
+           f"neither 3 nor 4 a day beat 2 a day (${base['pl']:+,.2f}, exam ${base['exam_pl']:+,.2f}) by the rule's margins")
+    out = {"run": datetime.now().isoformat(timespec="seconds"), "seeds": seeds, "results": res, "verdict": verdict, "why": why,
+           "best_per_day": int(best.split()[0]) if best[0].isdigit() else None}
+    os.makedirs(backtest.OUT_DIR, exist_ok=True)
+    with open(OUT_LIMITS, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=1)
+    log(f"Slots test (follow-up): {verdict}. {why}")
+    return out
 
 
 def run(log=print, data=None, seeds=SEEDS):

@@ -1,7 +1,7 @@
 {
-  "version": "1.8.2",
+  "version": "1.8.3",
   "notes": [
-    "New background test: what Wren should do when all 12 slots are full (keep skipping, your swap, a 20-day time limit, or swapping the nearly-done one), on 300 stocks over 5 years. Results show up in the log as 'Slots test'.",
-    "The swap rule stays off until the test decides."
+    "Follow-up test: your swap rule with 2, 3 or 4 switches a day (6 and no limit shown for information). Results show up in the log as 'Slots test (follow-up)'.",
+    "A hero's switches a day can be set with \"swaps_per_day\" in bots.json (default 2). The swap rule is still off until you say go."
   ]
 }

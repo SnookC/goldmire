@@ -226,6 +226,10 @@ SETTINGS_UPDATES = [
     ("2026-10-30-wren-12", "Wren holds up to 12 stocks from now on (the Fed-days 16 ends today; 8 would leave freed cash idle)", {
         "Stock-2": {"max_positions": 12},
     }),
+    ("2026-11-18-wren-swaps", "you asked: when Wren's 12 slots are full and a new stock gives a buy signal, she sells the stock "
+                              "with the smallest gain among those in the green and switches to the new one", {
+        "Stock-2": {"swap_green": True},
+    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [
@@ -651,6 +655,37 @@ def place_buy(rnd, bot, memory, symbol, dollars, price=None):
     return True
 
 
+SWAPS_PER_DAY = 2
+
+
+def swap_candidate(bot, memory, rnd, held):
+    """Your rule (Nov 18 2026), for heroes with "swap_green": true in bots.json. When every slot is full
+    and a new stock gives a buy signal, sell the stock with the SMALLEST GAIN among the ones in the green
+    and buy the new one. Never sells one at a loss, one bought today, or one of your own holds; at most
+    SWAPS_PER_DAY switches a day, one per round. Returns (symbol, gain in $) or None."""
+    if not bot.get("swap_green"):
+        return None
+    today = report.ny().strftime("%Y-%m-%d")
+    if memory.get("swaps", {}).get(bot["name"], {}).get(today, 0) >= SWAPS_PER_DAY:
+        return None
+    local_today = datetime.now().strftime("%Y-%m-%d")
+    green = []
+    for sym, h in held.items():
+        if h.get("hold") or str(h.get("opened", ""))[:10] == local_today:
+            continue
+        pos = rnd.positions.get(norm(sym))
+        try:
+            pl = float(pos.unrealized_pl) if pos is not None else 0.0
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if pl > 0:
+            green.append((pl, sym))
+    if not green:
+        return None
+    pl, sym = min(green)
+    return sym, round(pl, 2)
+
+
 def place_sell(trading, bot, memory, symbol, position=None, reason=""):
     try:
         position = position or trading.get_open_position(norm(symbol))
@@ -988,9 +1023,15 @@ def run_bot(bot, rnd, memory):
         log.info(f"[{name}] Pip's daily stop is on: no new buys today")
         return
     free_slots = max_positions(bot) - len(held)
+    swap_out = None
     if free_slots <= 0:
-        return
+        swap_out = swap_candidate(bot, memory, rnd, held)   # full: switch the smallest green gain for a new buy?
+        if not swap_out:
+            return
+        free_slots = 1
     committed = sum(h["cost"] for h in held.values())
+    if swap_out:
+        committed -= held[swap_out[0]].get("cost", 0)        # its money comes back when it's sold
     size = bank.slot_size(memory, bot, committed)
     if bot.get("sizing") == "risk":           # sized per trade below; here just: is there money left?
         size = round(bank.trade_size(memory, bot) - committed, 2)
@@ -1058,6 +1099,15 @@ def run_bot(bot, rnd, memory):
         size = risk.cap_buy(bot, memory, rnd.positions, sym, size, pots, benched, norm, log.info)
         if size < bank.MIN_TRADE:
             continue                              # Pip: no room for this one
+        if swap_out:                              # every slot is full: make room first (your swap rule)
+            out, gain = swap_out
+            swap_out = None
+            log.info(f"[{name}] SWAP: {sym} gives a buy signal and every slot is full, so {out} "
+                     f"(+${gain:,.2f}, the smallest gain of the stocks in the green) makes way")
+            place_sell(rnd.trading, bot, memory, out, rnd.positions.get(norm(out)), f"(swapped out for {sym}: smallest green gain)")
+            today = report.ny().strftime("%Y-%m-%d")
+            memory.setdefault("swaps", {})[name] = {today: memory["swaps"].get(name, {}).get(today, 0) + 1}
+            save_memory(memory)
         if place_buy(rnd, bot, memory, sym, size, prices.get(sym) or (c[-1] if c else None)):
             h = held_by(memory, bot)[sym]
             h["stop"] = stop

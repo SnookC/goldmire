@@ -132,3 +132,10 @@ Stop-loss test for Wren (Nov 2 2026, stop_test.py; rule set before the run):
   10% stop ....... +$236          +$278          +$1,826  ($851)
   15% stop ....... +$242          +$353          +$2,302  ($718)
   KEEP NO STOP: every stop made less on every list, and even the worst losing stretch was deeper.
+
+OWNER RULE, Nov 18 2026: Wren's swaps (not a tested idea)
+  Asked for by the owner: when Wren's 12 slots are full and a stock gives a buy signal, sell the
+  holding with the smallest gain among those in the green and buy the new one (never at a loss, not
+  one bought the same day, max 2 a day). Not back-tested: the test engine scores each stock on its own
+  and doesn't model full slots. Judge it live: swap trades are marked "swapped out for" in the journal,
+  so the scorecard can show what the sold stocks did afterwards vs what was bought.

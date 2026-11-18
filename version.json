@@ -1,7 +1,7 @@
 {
-  "version": "1.7.2",
+  "version": "1.8.0",
   "notes": [
-    "No crypto through the back door: stock heroes no longer buy funds that hold Bitcoin or Ether (IBIT, BITO, FBTC, ETHA...), since crypto trading stopped on Oct 13. Wren keeps the IBIT and BITO she already has until her normal rules sell them.",
-    "Pip counts Bitcoin and Ether funds as one Crypto industry (from 1.7.1)."
+    "Your swap rule for Wren: when all 12 slots are full and research turns up a stock with a buy signal, she sells the stock with the smallest gain among the ones in the green and buys the new one. Never at a loss, never one bought the same day, at most 2 switches a day.",
+    "Stock heroes don't buy Bitcoin/Ether funds (from 1.7.2)."
   ]
 }

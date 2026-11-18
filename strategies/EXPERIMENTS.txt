@@ -142,3 +142,11 @@ OWNER RULE, Nov 18 2026: Wren's swaps (not a tested idea)
   UPDATE (same day): switched OFF before it ever went live. slots_test.py replays Wren's 12 slots on
   300 stocks x 5 years and compares: now / the owner's swap / a 20-day time limit / swapping the
   nearly-done one. The rule for a winner is written at the top of slots_test.py.
+
+SLOTS TEST RESULTS, Nov 18 2026 (299 stocks, 1,495 days, 30 random orders, $1,000 pot, 12 slots)
+  now (skip when full)            +$398.94  exam +$106.99  worst drop $195.63
+  your swap (smallest green gain) +$579.34  exam +$242.53  worst drop $195.37  beat now in 90% of orders  <- WINNER
+  swap the nearly-done one        +$559.16  exam +$172.14  worst drop $183.77  (also qualified, made less)
+  time limit 20 days              +$447.96  exam  +$56.60  (failed the exam); 10 days +$168.01; 40 days +$409.38
+  Follow-up, swaps a day: 2 +$579.34 / 3 +$603.80 (exam lower, 60%) / 4 +$603.95 (47%): KEEP 2 A DAY
+  (6 a day and no limit +$617.70, information only.) Turned on for Wren: swap_green, 2 a day.

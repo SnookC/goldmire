@@ -1,7 +1,7 @@
 {
-  "version": "1.8.3",
+  "version": "1.8.4",
   "notes": [
-    "Follow-up test: your swap rule with 2, 3 or 4 switches a day (6 and no limit shown for information). Results show up in the log as 'Slots test (follow-up)'.",
-    "A hero's switches a day can be set with \"swaps_per_day\" in bots.json (default 2). The swap rule is still off until you say go."
+    "Your swap rule is ON for Wren: when all 12 slots are full and research turns up a stock with a buy signal, she sells the stock with the smallest gain among the ones in the green and buys the new one (never at a loss, at most 2 a day). It won the slots test: +$579 vs +$399 over 5 years on her $1,000.",
+    "3 or 4 swaps a day weren't reliably better than 2."
   ]
 }

@@ -1,7 +1,7 @@
 {
-  "version": "1.8.0",
+  "version": "1.8.1",
   "notes": [
-    "Your swap rule for Wren: when all 12 slots are full and research turns up a stock with a buy signal, she sells the stock with the smallest gain among the ones in the green and buys the new one. Never at a loss, never one bought the same day, at most 2 switches a day.",
+    "The swap rule is built but switched off until a test on 5 years of prices shows whether it helps.",
     "Stock heroes don't buy Bitcoin/Ether funds (from 1.7.2)."
   ]
 }

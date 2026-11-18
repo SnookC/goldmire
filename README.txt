@@ -444,7 +444,7 @@ SWAPS: MAKING ROOM FOR A GOOD NEW STOCK (1.8)
   a buy signal, she sells the stock with the SMALLEST GAIN among the ones that are in the green
   and buys the new one. She never sells one at a loss, one she bought the same day, or one of
   your own holds, and switches at most 2 a day (one per check). The log says "SWAP:" when it
-  happens. To turn it off, set "swap_green": false for Stock-2 in bots.json.
+  happens. It is OFF until the slots test decides (set "swap_green": true for Stock-2 to turn it on).
 
 START WITH WINDOWS (1.7)
   Run Goldmire in the background (5_run_in_background.bat, or the Goldmire icon) once:

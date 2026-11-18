@@ -226,10 +226,6 @@ SETTINGS_UPDATES = [
     ("2026-10-30-wren-12", "Wren holds up to 12 stocks from now on (the Fed-days 16 ends today; 8 would leave freed cash idle)", {
         "Stock-2": {"max_positions": 12},
     }),
-    ("2026-11-18-wren-swaps", "you asked: when Wren's 12 slots are full and a new stock gives a buy signal, she sells the stock "
-                              "with the smallest gain among those in the green and switches to the new one", {
-        "Stock-2": {"swap_green": True},
-    }),
 ]
 # Raising a hero's "dollars" doesn't change a pot that already exists, so a raise also tops the pot up once.
 POT_TOPUPS = [

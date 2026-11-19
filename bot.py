@@ -1107,7 +1107,8 @@ def run_bot(bot, rnd, memory):
                      f"(+${gain:,.2f}, the smallest gain of the stocks in the green) makes way")
             place_sell(rnd.trading, bot, memory, out, rnd.positions.get(norm(out)), f"(swapped out for {sym}: smallest green gain)")
             today = report.ny().strftime("%Y-%m-%d")
-            memory.setdefault("swaps", {})[name] = {today: memory["swaps"].get(name, {}).get(today, 0) + 1}
+            sw = memory.setdefault("swaps", {})          # (1.8.5: this line used to fail before the buy)
+            sw[name] = {today: sw.get(name, {}).get(today, 0) + 1}
             save_memory(memory)
         if place_buy(rnd, bot, memory, sym, size, prices.get(sym) or (c[-1] if c else None)):
             h = held_by(memory, bot)[sym]

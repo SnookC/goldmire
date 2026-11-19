@@ -1,7 +1,7 @@
 {
-  "version": "1.8.4",
+  "version": "1.8.5",
   "notes": [
-    "Your swap rule is ON for Wren: when all 12 slots are full and research turns up a stock with a buy signal, she sells the stock with the smallest gain among the ones in the green and buys the new one (never at a loss, at most 2 a day). It won the slots test: +$579 vs +$399 over 5 years on her $1,000.",
-    "3 or 4 swaps a day weren't reliably better than 2."
+    "Fixed: after a swap sold its stock, a bookkeeping line failed, so the new stock was only bought at the next check (5 minutes later) and the 2-a-day limit wasn't counted.",
+    "Scorecard corrected for BITO's 1-for-2 reverse split: the practice account doubled BITO's price but not Wren's share count, so the sale showed +$28.06 instead of about -$9.83."
   ]
 }

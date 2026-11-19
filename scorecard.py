@@ -59,7 +59,15 @@ def shift(memory, name, amount):
 # one-time corrections for money moved before shift() existed
 FIXES = [("2026-10-28-gareth-spare", {"Stock-1": -219.41, "Stock-2": 219.41}),
          # Gareth's retirement put $14.21 over Wren's limit straight into her savings: a transfer, not a profit
-         ("2026-11-05-retire-extra", {"Stock-2": 14.21})]
+         ("2026-11-05-retire-extra", {"Stock-2": 14.21}),
+         # BITO's 1-for-2 reverse split (Nov 19 2026): the practice account doubled the price but not the share
+         # count, so Wren's BITO sold for twice its real value. Real result about -$9.83, booked as +$28.06:
+         # $37.89 that wasn't earned
+         ("2026-11-19-bito-split", {"Stock-2": 37.89})]
+
+# one-time corrections to a sale in the journal: (id, bot, symbol, day, real result $, why)
+JOURNAL_FIXES = [("2026-11-19-bito-split-trade", "Stock-2", "BITO", "2026-11-19", -9.83,
+                  "BITO's 1-for-2 reverse split: the practice account doubled the price but not the share count")]
 
 
 def apply_fixes(memory):
@@ -69,6 +77,14 @@ def apply_fixes(memory):
             continue
         for name, amount in moves.items():
             shift(memory, name, amount)
+        done.add(uid)
+    for uid, bot, sym, day, pl, why in JOURNAL_FIXES:
+        if uid in done:
+            continue
+        for e in memory.get("journal", []):
+            if (e.get("side") == "sell" and e.get("bot") == bot and str(e.get("symbol", "")).replace("/", "") == sym
+                    and str(e.get("t", ""))[:10] == day):
+                e["pl_reported"], e["pl"], e["fixed"] = e.get("pl"), pl, why
         done.add(uid)
     memory["score_fixes"] = sorted(done)
 
